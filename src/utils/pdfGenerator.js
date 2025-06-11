@@ -1,6 +1,32 @@
 import { jsPDF } from 'jspdf';
+import championDataRaw from '../assets/data/championFull.json';
 
-export const generatePlayerPDF = (playerData, championMastery) => {
+// Hilfsfunktion: ChampionId (int) zu Name
+function getChampionNameById(id) {
+  const champKey = String(id);
+  const champions = championDataRaw.data;
+  for (const champName in champions) {
+    if (champions[champName].key === champKey) {
+      return champions[champName].name;
+    }
+  }
+  return `[ID: ${id}]`;
+}
+
+// Hilfsfunktion: Bild als DataURL laden
+async function getProfileIconDataUrl(profileIconId) {
+  const url = `/assets/data/profileicon/${profileIconId}.png`;
+  const response = await fetch(url);
+  const blob = await response.blob();
+  return await new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.readAsDataURL(blob);
+  });
+}
+
+// Async PDF-Generator!
+export const generatePlayerPDF = async (playerData, championMastery, leagueDetails, riotId, summonerInfo) => {
   const doc = new jsPDF();
 
   // Add a title
@@ -12,39 +38,94 @@ export const generatePlayerPDF = (playerData, championMastery) => {
   doc.setLineWidth(0.5);
   doc.line(10, 25, 200, 25);
 
+  // Add Riot ID details
+  doc.setFont('Helvetica', 'normal');
+  doc.setFontSize(12);
+  if (riotId && riotId.gameName && riotId.tagLine) {
+    doc.text(`Riot ID: ${riotId.gameName}#${riotId.tagLine}`, 10, 40);
+  } else {
+    doc.text('Riot ID: [Unknown]', 10, 40);
+  }
+
+  // Add Summoner Level and Profile Icon
+  let y = 50;
+  if (summonerInfo) {
+    doc.text(`Summoner Level: ${summonerInfo.summonerLevel ?? '[Unknown]'}`, 10, y);
+    y += 10;
+    if (summonerInfo.profileIconId) {
+      try {
+        const dataUrl = await getProfileIconDataUrl(summonerInfo.profileIconId);
+        doc.text('Profile Icon:', 10, y);
+        doc.addImage(dataUrl, 'PNG', 50, y - 5, 20, 20);
+      } catch (e) {
+        doc.text('Profile Icon: [Bild nicht gefunden]', 10, y);
+      }
+    } else {
+      doc.text('Profile Icon: [Unknown]', 10, y);
+    }
+    y += 20;
+  } else {
+    doc.text('Summoner Level: [Unknown]', 10, y);
+    y += 10;
+    doc.text('Profile Icon: [Unknown]', 10, y);
+    y += 20;
+  }
+
   // Add player details
   doc.setFont('Helvetica', 'normal');
   doc.setFontSize(12);
   if (playerData && playerData.puuid) {
-    doc.text(`Summoner Name: ${playerData.gameName || '[Unknown]'}`, 10, 40);
-    doc.text(`Region: ${playerData.tagLine || '[Unknown]'}`, 10, 50);
-    doc.text(`PUUID: ${playerData.puuid}`, 10, 60);
+    doc.text(`Summoner Name: ${playerData.gameName || '[Unknown]'}`, 10, y);
+    y += 10;
+    doc.text(`Region: ${playerData.tagLine || '[Unknown]'}`, 10, y);
+    y += 10;
+    doc.text(`PUUID: ${playerData.puuid}`, 10, y);
+    y += 10;
   } else {
-    doc.text('Summoner Name: [Placeholder]', 10, 40);
-    doc.text('Region: [Placeholder]', 10, 50);
-    doc.text('PUUID: [Placeholder]', 10, 60);
+    doc.text('Summoner Name: [Placeholder]', 10, y);
+    y += 10;
+    doc.text('Region: [Placeholder]', 10, y);
+    y += 10;
+    doc.text('PUUID: [Placeholder]', 10, y);
+    y += 10;
+  }
+
+  // Add league details (Rank, Wins, Losses)
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.text('Ranked Stats:', 10, y);
+  doc.setFont('Helvetica', 'normal');
+  doc.setFontSize(12);
+  if (leagueDetails && leagueDetails.length > 0) {
+    const entry = leagueDetails[0]; // Zeige z.B. nur das erste Queue-Entry
+    doc.text(`Rank: ${entry.tier || '-'} ${entry.rank || ''}`, 10, y + 10);
+    doc.text(`Wins: ${entry.wins ?? '-'}`, 10, y + 20);
+    doc.text(`Losses: ${entry.losses ?? '-'}`, 10, y + 30);
+  } else {
+    doc.text('Keine Ranked-Daten gefunden.', 10, y + 10);
   }
 
   // Add top 3 champions
   doc.setFont('Helvetica', 'bold');
   doc.setFontSize(14);
-  doc.text('Top 3 Most-Played Champions:', 10, 80);
+  doc.text('Top 3 Most-Played Champions:', 10, y + 50);
 
   doc.setFont('Helvetica', 'normal');
   doc.setFontSize(12);
   if (championMastery && championMastery.length > 0) {
     championMastery.slice(0, 3).forEach((champion, index) => {
-      doc.text(`${index + 1}. Champion ID: ${champion.championId}`, 10, 90 + index * 20);
-      doc.text(`   Champion Points: ${champion.championPoints}`, 10, 95 + index * 20);
-      doc.text(`   Champion Level: ${champion.championLevel}`, 10, 100 + index * 20);
+      const champName = getChampionNameById(champion.championId);
+      doc.text(`${index + 1}. ${champName}`, 10, y + 60 + index * 20);
+      doc.text(`   Champion Points: ${champion.championPoints}`, 10, y + 65 + index * 20);
+      doc.text(`   Champion Level: ${champion.championLevel}`, 10, y + 70 + index * 20);
     });
   } else {
-    doc.text('No champion mastery data available.', 10, 90);
+    doc.text('No champion mastery data available.', 10, y + 60);
   }
 
   // Add footer
   doc.setFontSize(10);
-  doc.text('Generated by League of Legends PDF-Creator', 10, 280);
+  doc.text('Generated by SummonerSheet.gg', 10, 280);
 
   const pdfBlob = doc.output('blob');
   return URL.createObjectURL(pdfBlob); // Return the Blob URL

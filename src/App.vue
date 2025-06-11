@@ -3,7 +3,7 @@ import HelloWorld from './components/HelloWorld.vue'
 </script>
 
 <template>
-  <HelloWorld msg="League of Legends PDF-Creator" />
+  <HelloWorld msg="SummonerSheet" />
 </template>
 
 <style scoped>

@@ -2,7 +2,7 @@ import axios from 'axios';
 import { API_KEY } from './config';
 
 const riotApi = axios.create({
-  baseURL: 'https://europe.api.riotgames.com',
+  baseURL: 'https://euw1.api.riotgames.com',
   params: {
     api_key: API_KEY, // Use the imported API key
   },
