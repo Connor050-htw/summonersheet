@@ -2,10 +2,37 @@ This is a website to create a PDF with the most important informations about you
 
 # --- to code: ----------------------------------------
 
-To start the server localy: 'npm run dev'
+-To start the server localy: 'npm run dev'
+# ------------
+-To deploy spawn bugfix: 'git.js' -> 
+/**
+ * Remove all unversioned files.
+ * @param {string | Array<string>} files Files argument.
+ * @return {Promise} A promise.
+ */
+Git.prototype.rm = function (files) {
+  if (!Array.isArray(files)) {
+    files = [files];
+  }
+  return this.exec('rm', '--ignore-unmatch', '-r', '-f', '--', ...files);
+};
+
+/**
+ * Remove all unversioned files.
+ * @param {string | Array<string>} files Files argument.
+ * @return {Promise} A promise.
+ */
+Git.prototype.rm = function () {
+  return this.exec('rm', '--ignore-unmatch', '-r', '-f', '--', '.');
+};
+
+# ------------
 
 The API key has to be activated (needs to be refreshed every 24h): https://developer.riotgames.com/
 
+# ------------
+
+To deploy the website: 'npm run deploy' and set github-pages on the correct branch 'gh-pages/root'
 
 # --- ideas: ------------------------------------------
 

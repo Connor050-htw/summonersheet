@@ -79,14 +79,10 @@ export const generatePlayerPDF = async (playerData, championMastery, leagueDetai
     y += 10;
     doc.text(`Region: ${playerData.tagLine || '[Unknown]'}`, 10, y);
     y += 10;
-    doc.text(`PUUID: ${playerData.puuid}`, 10, y);
-    y += 10;
   } else {
     doc.text('Summoner Name: [Placeholder]', 10, y);
     y += 10;
     doc.text('Region: [Placeholder]', 10, y);
-    y += 10;
-    doc.text('PUUID: [Placeholder]', 10, y);
     y += 10;
   }
 
