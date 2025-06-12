@@ -15,7 +15,7 @@ function getChampionNameById(id) {
 
 // Hilfsfunktion: Bild als DataURL laden
 async function getProfileIconDataUrl(profileIconId) {
-  const url = `/assets/data/profileicon/${profileIconId}.png`;
+  const url = `${import.meta.env.BASE_URL}assets/data/profileicon/${profileIconId}.png`;
   const response = await fetch(url);
   const blob = await response.blob();
   return await new Promise((resolve) => {
