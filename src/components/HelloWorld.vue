@@ -17,10 +17,11 @@ const summonerInfo = ref(null);
 const errorMessage = ref('');
 const pdfPreviewUrl = ref(null);
 const isLoading = ref(false); // <-- Neu hinzugefügt
+const hasGenerated = ref(false);
 
 // Generate a placeholder PDF on component load
 onMounted(async () => {
-  pdfPreviewUrl.value = await generatePlayerPDF(null, null, null, null, null); // Async-Aufruf!
+  pdfPreviewUrl.value = null; // Keine Preview beim Start!
 });
 
 function wait(ms) {
@@ -29,6 +30,7 @@ function wait(ms) {
 
 const fetchAndGeneratePDF = async () => {
   isLoading.value = true;
+  hasGenerated.value = false;
   const start = Date.now();
   try {
     const data = await getSummonerByName(gameName.value, tagLine.value);
@@ -54,6 +56,7 @@ const fetchAndGeneratePDF = async () => {
       summonerInfo.value,
       null
     );
+    hasGenerated.value = true;
     errorMessage.value = '';
   } catch (error) {
     errorMessage.value = 'Failed to fetch player data. Please try again.';
@@ -113,10 +116,10 @@ onUnmounted(() => {
       <button @click="fetchAndGeneratePDF" class="button">Generate PDF</button>
     </div>
     <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
-    <div class="pdf-preview">
+    <!-- PDF Preview nur anzeigen, wenn pdfPreviewUrl gesetzt ist UND nicht im Initialzustand -->
+    <div v-if="pdfPreviewUrl && !isLoading && hasGenerated" class="pdf-preview">
       <h3>PDF Preview:</h3>
-      <iframe v-if="!isLoading" :src="pdfPreviewUrl" width="100%" height="1178rem"></iframe>
-      <p v-else>Loading...</p> <!-- Ladeanzeige -->
+      <iframe :src="pdfPreviewUrl" width="100%" height="1178rem"></iframe>
     </div>
     <div v-if="isLoading" class="loading-overlay">
       <div class="spinner">

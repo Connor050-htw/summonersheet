@@ -3,7 +3,7 @@ import HelloWorld from './components/HelloWorld.vue'
 </script>
 
 <template>
-  <HelloWorld msg="SummonerSheet" />
+  <HelloWorld />
 </template>
 
 <style scoped>
