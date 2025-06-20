@@ -95,7 +95,7 @@ onUnmounted(() => {
     <h1 class="title krass-title">SummonerSheet</h1>
     <div class="description-box">
       <p>
-        <strong>What is this Website?</strong><br />
+        <strong>What is this Website?</strong><br/>
         Generate a beautiful PDF with the most important stats and information about your League of Legends account.<br />
         You can share, download, or print the PDF to impress your friend!<br />
       </p>
@@ -218,7 +218,6 @@ onUnmounted(() => {
   background: linear-gradient(120deg, transparent 0%, #fff6 50%, transparent 100%);
   transform: skewX(-25deg);
   transition: left 0.5s;
-  pointer-events: none;
 }
 
 .krass-title:hover::after {
@@ -266,16 +265,42 @@ onUnmounted(() => {
 .button {
   padding: 0.8rem;
   border: none;
-  border-radius: 5px;
-  background: #e2c08d;
-  color: #1a1a1a;
+  border-radius: 10px;
+  background: linear-gradient(270deg, #e2c08d 0%, #f4e4c1 100%);
+  color: #2a210a;
   font-size: 1rem;
+  font-weight: 700;
   cursor: pointer;
-  transition: background 0.3s ease;
+  transition: box-shadow 0.3s, background 0.3s;
+  position: relative;
+  overflow: hidden;
+  letter-spacing: 0.08em;
+  box-shadow: 0 2px 8px 0 #e2c08d22;
+  text-shadow:
+    0 1px 2px #fff8,
+    0 2px 6px #0004;
+}
+
+.button::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -75%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(120deg, transparent 0%, #fff6 50%, transparent 100%);
+  transform: skewX(-25deg);
+  transition: left 0.5s;
+  pointer-events: none;
+}
+
+.button:hover::after {
+  left: 120%;
+  transition: left 0.7s;
 }
 
 .button:hover {
-  background: #f4e4c1;
+  background: linear-gradient(90deg, #f4e4c1 0%, #e2c08d 100%);
+  box-shadow: 0 4px 16px 0 #e2c08d44;
 }
 
 .error-message {
