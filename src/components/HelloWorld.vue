@@ -6,6 +6,7 @@ import { getPlayerDetailsByPUUID } from '../api/GetPlayerDetails';
 import { getRiotIdByPUUID } from '../api/GetRiotIdByPUUID';
 import { getSummonerByPUUID } from '../api/GetSummonerByPUUID';
 import { generatePlayerPDF } from '../utils/pdfGenerator';
+import { getTftLeagueByPUUID } from '../api/GetTftLeagueByPUUID';
 
 const gameName = ref('MarFlow');
 const tagLine = ref('EUW');
@@ -40,7 +41,15 @@ const fetchAndGeneratePDF = async () => {
     championMastery.value = masteryData;
 
     const leagueData = await getPlayerDetailsByPUUID(data.puuid);
-    leagueDetails.value = leagueData;
+    const tftLeagueData = await getTftLeagueByPUUID(data.puuid);
+
+    // Kombiniere alle League-Daten (Solo, Flex, TFT)
+    const allLeagueDetails = [
+      ...(leagueData || []),
+      ...(tftLeagueData || [])
+    ];
+
+    leagueDetails.value = allLeagueDetails;
 
     const riotIdData = await getRiotIdByPUUID(data.puuid);
     riotId.value = riotIdData;

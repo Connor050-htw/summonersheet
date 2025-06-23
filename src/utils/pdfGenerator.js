@@ -115,21 +115,21 @@ export const generatePlayerPDF = async (playerData, championMastery, leagueDetai
 
   doc.setFont('Helvetica', 'normal');
   doc.setFontSize(12);
-  let rankY = y + 10;
+  let rankY = y + 12;
 
   // Debug: Normal Stats ausgeben
   console.log('Normal Stats:', normalStats);
 
   function getQueueDisplayName(queueType) {
     switch ((queueType || '').toUpperCase()) {
-      case 'RANKED_SOLO_5X5':
-      case 'SOLO_5X5':
-      case 'SOLOQ':
-        return 'Solo-Ranked';
       case 'RANKED_FLEX_SR':
       case 'FLEX_SR':
       case 'FLEX':
         return 'Flex-Ranked';
+      case 'RANKED_SOLO_5X5':
+      case 'SOLO_5X5':
+      case 'SOLOQ':
+        return 'Solo-Ranked';
       case 'RANKED_TFT':
         return 'TFT-Ranked';
       case 'NORMAL_DRAFT':
@@ -141,94 +141,107 @@ export const generatePlayerPDF = async (playerData, championMastery, leagueDetai
     }
   }
 
-  if (leagueDetails && leagueDetails.length > 0) {
-    for (const entry of leagueDetails) {
-      const wins = entry.wins ?? 0;
-      const losses = entry.losses ?? 0;
+  const allQueues = [
+    { key: 'RANKED_FLEX_SR', label: 'Flex-Ranked' },
+    { key: 'RANKED_SOLO_5X5', label: 'Solo-Ranked' },
+    { key: 'RANKED_TFT', label: 'TFT-Ranked' }
+  ];
+
+  for (const queue of allQueues) {
+    const entry = (leagueDetails || []).find(e => (e.queueType || '').toUpperCase() === queue.key);
+    let wins = 0, losses = 0, tier = '', rank = '', winrate = '-', isUnrated = false;
+
+    if (entry) {
+      wins = entry.wins ?? 0;
+      losses = entry.losses ?? 0;
+      tier = entry.tier || '';
+      rank = entry.rank || '';
       const total = wins + losses;
-      const winrate = total > 0 ? ((wins / total) * 100).toFixed(1) + '%' : '-';
-
-      // Farben für die Ranks
-      const rankBgColors = {
-        IRON: [80, 80, 80],
-        BRONZE: [176, 141, 87],
-        SILVER: [180, 180, 200],
-        GOLD: [255, 215, 64],
-        PLATINUM: [64, 224, 208],
-        EMERALD: [80, 200, 120],
-        DIAMOND: [90, 155, 255],
-        MASTER: [186, 85, 211],
-        GRANDMASTER: [220, 20, 60],
-        CHALLENGER: [255, 215, 0]
-      };
-      const rank = (entry.tier || '').toUpperCase();
-      const color = rankBgColors[rank] || [55, 55, 55];
-
-      // Text
-      doc.setFontSize(15); // Text größer machen
-      doc.setFont('Helvetica', 'bold');
-      const queueText = `${getQueueDisplayName(entry.queueType)} | ${entry.tier || '-'} ${entry.rank || ''} | Wins: ${wins} | Losses: ${losses} | Winrate: ${winrate}`;
-
-      // Farbig umrahmter Rahmen NUR um den Rank-Text
-      const rankStr = `${entry.tier || '-'}`;
-      const rankStart = queueText.indexOf(rankStr);
-      // Schätze die X-Position des Ranks im Text (Font ist monospace-ähnlich)
-      const charWidth = 2.6; // ggf. anpassen je nach Schrift
-      const rankBoxX = 7;
-      const rankBoxY = rankY - 7;
-      const rankBoxWidth = 195; // Breite für Tier + evtl. Division
-      doc.setDrawColor(color[0], color[1], color[2]);
-      doc.setLineWidth(1.2);
-      doc.rect(rankBoxX, rankBoxY, rankBoxWidth, 12, 'S');
-
-      // Rank-Text (zentriert im Rahmen)
-      doc.setTextColor(0, 0, 0);
-      doc.text(queueText, 10, rankY);
-
-      // Rank-Icon anzeigen (rechts neben dem Text)
-      if (entry.tier) {
-        try {
-          const dataUrl = await getRankIconDataUrl(entry.tier);
-          doc.addImage(dataUrl, 'PNG', 180, rankY - 9, 15, 15);
-        } catch (e) {
-          // Icon nicht gefunden, ignoriere
-        }
-      }
-      rankY += 20;
+      winrate = total > 0 ? ((wins / total) * 100).toFixed(1) + '%' : '-';
+      isUnrated = false;
+    } else {
+      isUnrated = true;
     }
+
+    // Farben für die Ranks
+    const rankBgColors = {
+      IRON: [80, 80, 80],
+      BRONZE: [176, 141, 87],
+      SILVER: [180, 180, 200],
+      GOLD: [255, 215, 64],
+      PLATINUM: [64, 224, 208],
+      EMERALD: [80, 200, 120],
+      DIAMOND: [90, 155, 255],
+      MASTER: [186, 85, 211],
+      GRANDMASTER: [220, 20, 60],
+      CHALLENGER: [255, 215, 0]
+    };
+    const color = rankBgColors[(tier || '').toUpperCase()] || [55, 55, 55];
+
+    // Text
+    doc.setFontSize(15);
+    doc.setFont('Helvetica', 'bold');
+    const queueText = isUnrated
+      ? `${queue.label} | unranked`
+      : `${queue.label} | ${tier || '-'} ${rank || ''} | Wins: ${wins} | Losses: ${losses} | Winrate: ${winrate}`;
+
+    // Rahmen
+    const rankBoxX = 7;
+    const rankBoxY = rankY - 7;
+    const rankBoxWidth = 195;
+    doc.setDrawColor(color[0], color[1], color[2]);
+    doc.setLineWidth(1.2);
+    doc.rect(rankBoxX, rankBoxY, rankBoxWidth, 12, 'S');
+
+    // Text
+    doc.setTextColor(0, 0, 0);
+    doc.text(queueText, 10, rankY);
+
+    // Rank-Icon anzeigen (nur wenn vorhanden)
+    if (!isUnrated && tier) {
+      try {
+        const dataUrl = await getRankIconDataUrl(tier);
+        doc.addImage(dataUrl, 'PNG', 180, rankY - 9, 15, 15);
+      } catch (e) {
+        // Icon nicht gefunden, ignoriere
+      }
+    }
+    rankY += 20;
   }
-  // NEU: Normals anzeigen
-  if ((!leagueDetails || leagueDetails.length === 0) && (!normalStats || normalStats.games === 0)) {
-    doc.text('Keine Ranked- oder Normal-Daten gefunden.', 10, rankY);
-    rankY += 10;
-  }
+
   // fette schwarze Linie darunter (wie oben)
   doc.setDrawColor(0, 0, 0);
   doc.setLineWidth(1.5);
-  doc.line(10, rankY + 12, pageWidth - 10, rankY + 12);
+  // Weniger Abstand: Linie direkt unter die letzte Box
+  doc.line(10, rankY + 1, pageWidth - 10, rankY + 1);
 
-  // Add top 3 champions (zentriert, gleiche Größe und Fett wie Ranked Stats)
+  // Add top 3 champions (direkt unter die Linie)
+  const topChampionsY = rankY + 8; // Weniger Abstand
   doc.setFont('Helvetica', 'bold');
   doc.setFontSize(18);
-  doc.text('Top 3 Most-Played Champions', pageWidth / 2, rankY + 20, { align: 'center' });
+  doc.text('Top 3 Most-Played Champions', pageWidth / 2, topChampionsY, { align: 'center' });
 
   doc.setFont('Helvetica', 'normal');
   doc.setFontSize(12);
 
   if (championMastery && championMastery.length > 0) {
-    const imgSize = 65;
+    // Bilder direkt unter die Überschrift
+    const imgY = topChampionsY + 6;
+    const imgWidth = 65; // Breite der Bilder in mm
+    const imgHeight = (imgWidth * 560) / 308; // Höhe basierend auf dem Verhältnis 308x560
     const margin = 10;
     const pageWidth = 210; // A4 width in mm for jsPDF
     const totalImgs = Math.min(3, championMastery.length);
     const totalSpace = pageWidth - 2 * margin;
-    const spaceBetween = 5;
-    const totalImgWidth = imgSize * totalImgs + spaceBetween * (totalImgs - 1);
+    const spaceBetween = 5; // Abstand zwischen den Bildern
+    const totalImgWidth = imgWidth * totalImgs + spaceBetween * (totalImgs - 1);
     const startX = margin + Math.floor((totalSpace - totalImgWidth) / 2);
 
     for (let i = 0; i < totalImgs; i++) {
       const champion = championMastery[i];
       const champName = getChampionNameById(champion.championId);
       const loadingImgUrl = `${import.meta.env.BASE_URL}assets/data/championloading/${champName}_0.jpg`;
+
       try {
         const response = await fetch(loadingImgUrl);
         const blob = await response.blob();
@@ -237,30 +250,31 @@ export const generatePlayerPDF = async (playerData, championMastery, leagueDetai
           reader.onloadend = () => resolve(reader.result);
           reader.readAsDataURL(blob);
         });
-        const x = startX + i * (imgSize + spaceBetween);
-        const yImg = rankY + 30;
-        doc.addImage(dataUrl, 'JPEG', x, yImg, imgSize, imgSize);
 
-        // Trennbalken (außer nach dem letzten Bild)
-        if (i < totalImgs - 1) {
-          doc.setDrawColor(120);
-          doc.setLineWidth(1);
-          doc.line(x + imgSize + spaceBetween / 2, yImg, x + imgSize + spaceBetween / 2, yImg + imgSize);
-        }
+        const x = startX + i * (imgWidth + spaceBetween);
+        const yImg = imgY +5;
 
-        // Champion-Infos unter das Bild schreiben
+        // Bild hinzufügen mit proportionaler Größe
+        doc.addImage(dataUrl, 'JPEG', x, yImg, imgWidth, imgHeight);
+
+        // Champion-Name zentriert über dem Bild
+        doc.setFont('Helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.text(champName, x + imgWidth / 2, yImg - 3, { align: 'center' });
+
+        // Punkte links unter dem Bild
         doc.setFont('Helvetica', 'normal');
-        doc.setFontSize(11);
-        doc.text(`${champName}`, x, yImg + imgSize + 8);
         doc.setFontSize(10);
-        doc.text(`Points: ${champion.championPoints}`, x, yImg + imgSize + 14);
-        doc.text(`Level: ${champion.championLevel}`, x, yImg + imgSize + 20);
+        doc.text(`Points: ${champion.championPoints}`, x, yImg + imgHeight + 4);
+
+        // Level rechts unter dem Bild
+        doc.text(`Level: ${champion.championLevel}`, x + imgWidth - 0, yImg + imgHeight + 4, { align: 'right' });
       } catch (e) {
         // Bild nicht gefunden, ignoriere
       }
     }
   } else {
-    doc.text('No champion mastery data available.', 10, rankY + 30);
+    doc.text('No champion mastery data available.', 10, topChampionsY + 30);
   }
 
   // Add footer (nutze die oben deklarierten Variablen)
