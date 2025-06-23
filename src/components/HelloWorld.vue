@@ -6,6 +6,7 @@ import { getPlayerDetailsByPUUID } from '../api/GetPlayerDetails';
 import { getRiotIdByPUUID } from '../api/GetRiotIdByPUUID';
 import { getSummonerByPUUID } from '../api/GetSummonerByPUUID';
 import { generatePlayerPDF } from '../utils/pdfGenerator';
+import { getTftLeagueByPUUID } from '../api/GetTftLeagueByPUUID';
 
 const gameName = ref('MarFlow');
 const tagLine = ref('EUW');
@@ -17,10 +18,11 @@ const summonerInfo = ref(null);
 const errorMessage = ref('');
 const pdfPreviewUrl = ref(null);
 const isLoading = ref(false); // <-- Neu hinzugefügt
+const hasGenerated = ref(false);
 
 // Generate a placeholder PDF on component load
 onMounted(async () => {
-  pdfPreviewUrl.value = await generatePlayerPDF(null, null, null, null, null); // Async-Aufruf!
+  pdfPreviewUrl.value = null; // Keine Preview beim Start!
 });
 
 function wait(ms) {
@@ -29,6 +31,7 @@ function wait(ms) {
 
 const fetchAndGeneratePDF = async () => {
   isLoading.value = true;
+  hasGenerated.value = false;
   const start = Date.now();
   try {
     const data = await getSummonerByName(gameName.value, tagLine.value);
@@ -38,7 +41,15 @@ const fetchAndGeneratePDF = async () => {
     championMastery.value = masteryData;
 
     const leagueData = await getPlayerDetailsByPUUID(data.puuid);
-    leagueDetails.value = leagueData;
+    const tftLeagueData = await getTftLeagueByPUUID(data.puuid);
+
+    // Kombiniere alle League-Daten (Solo, Flex, TFT)
+    const allLeagueDetails = [
+      ...(leagueData || []),
+      ...(tftLeagueData || [])
+    ];
+
+    leagueDetails.value = allLeagueDetails;
 
     const riotIdData = await getRiotIdByPUUID(data.puuid);
     riotId.value = riotIdData;
@@ -54,6 +65,7 @@ const fetchAndGeneratePDF = async () => {
       summonerInfo.value,
       null
     );
+    hasGenerated.value = true;
     errorMessage.value = '';
   } catch (error) {
     errorMessage.value = 'Failed to fetch player data. Please try again.';
@@ -92,7 +104,7 @@ onUnmounted(() => {
     <h1 class="title krass-title">SummonerSheet</h1>
     <div class="description-box">
       <p>
-        <strong>What is this Website?</strong><br />
+        <strong>What is this Website?</strong><br/>
         Generate a beautiful PDF with the most important stats and information about your League of Legends account.<br />
         You can share, download, or print the PDF to impress your friend!<br />
       </p>
@@ -113,10 +125,10 @@ onUnmounted(() => {
       <button @click="fetchAndGeneratePDF" class="button">Generate PDF</button>
     </div>
     <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
-    <div class="pdf-preview">
+    <!-- PDF Preview nur anzeigen, wenn pdfPreviewUrl gesetzt ist UND nicht im Initialzustand -->
+    <div v-if="pdfPreviewUrl && !isLoading && hasGenerated" class="pdf-preview">
       <h3>PDF Preview:</h3>
-      <iframe v-if="!isLoading" :src="pdfPreviewUrl" width="100%" height="1178rem"></iframe>
-      <p v-else>Loading...</p> <!-- Ladeanzeige -->
+      <iframe :src="pdfPreviewUrl" width="100%" height="1178rem"></iframe>
     </div>
     <div v-if="isLoading" class="loading-overlay">
       <div class="spinner">
@@ -215,7 +227,6 @@ onUnmounted(() => {
   background: linear-gradient(120deg, transparent 0%, #fff6 50%, transparent 100%);
   transform: skewX(-25deg);
   transition: left 0.5s;
-  pointer-events: none;
 }
 
 .krass-title:hover::after {
@@ -263,16 +274,42 @@ onUnmounted(() => {
 .button {
   padding: 0.8rem;
   border: none;
-  border-radius: 5px;
-  background: #e2c08d;
-  color: #1a1a1a;
+  border-radius: 10px;
+  background: linear-gradient(270deg, #e2c08d 0%, #f4e4c1 100%);
+  color: #2a210a;
   font-size: 1rem;
+  font-weight: 700;
   cursor: pointer;
-  transition: background 0.3s ease;
+  transition: box-shadow 0.3s, background 0.3s;
+  position: relative;
+  overflow: hidden;
+  letter-spacing: 0.08em;
+  box-shadow: 0 2px 8px 0 #e2c08d22;
+  text-shadow:
+    0 1px 2px #fff8,
+    0 2px 6px #0004;
+}
+
+.button::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -75%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(120deg, transparent 0%, #fff6 50%, transparent 100%);
+  transform: skewX(-25deg);
+  transition: left 0.5s;
+  pointer-events: none;
+}
+
+.button:hover::after {
+  left: 120%;
+  transition: left 0.7s;
 }
 
 .button:hover {
-  background: #f4e4c1;
+  background: linear-gradient(90deg, #f4e4c1 0%, #e2c08d 100%);
+  box-shadow: 0 4px 16px 0 #e2c08d44;
 }
 
 .error-message {

@@ -57,133 +57,191 @@ async function getRankIconDataUrl(tier) {
 export const generatePlayerPDF = async (playerData, championMastery, leagueDetails, riotId, summonerInfo, normalStats) => {
   const doc = new jsPDF();
 
-  // Add a title
-  doc.setFont('Helvetica', 'bold');
-  doc.setFontSize(18);
-  doc.text('League of Legends Player Report', 10, 20);
-
-  // Add timestamp oben rechts
+  // Timestamp und Footer vorbereiten (nur EINMAL deklarieren)
   const now = new Date();
   const timestamp = now.toLocaleString();
-  doc.setFontSize(10);
-  doc.setFont('Helvetica', 'normal');
-  doc.text(timestamp, 200, 15, { align: 'right' });
 
-  // Add a horizontal line
-  doc.setLineWidth(0.5);
-  doc.line(10, 25, 200, 25);
+  // Maße für Header
+  const pageWidth = 210;
+  const profileSize = 32;
+  const profileX = 12;
+  const profileY = 10;
+  const border = 4;
 
-  // Add Riot ID details
-  doc.setFont('Helvetica', 'normal');
-  doc.setFontSize(12);
-  if (riotId && riotId.gameName && riotId.tagLine) {
-    doc.text(`Riot ID: ${riotId.gameName}#${riotId.tagLine}`, 10, 40);
-  } else {
-    doc.text('Riot ID: [Unknown]', 10, 40);
-  }
-
-  // Add Summoner Level and Profile Icon
-  let y = 50;
-  if (summonerInfo) {
-    doc.text(`Summoner Level: ${summonerInfo.summonerLevel ?? '[Unknown]'}`, 10, y);
-    y += 10;
-    if (summonerInfo.profileIconId) {
-      try {
-        const dataUrl = await getProfileIconDataUrl(summonerInfo.profileIconId);
-        doc.text('Profile Icon:', 10, y);
-        doc.addImage(dataUrl, 'PNG', 50, y - 5, 20, 20);
-      } catch (e) {
-        doc.text('Profile Icon: [Bild nicht gefunden]', 10, y);
-      }
-    } else {
-      doc.text('Profile Icon: [Unknown]', 10, y);
+  // Profilbild mit goldener Umrandung
+  if (summonerInfo && summonerInfo.profileIconId) {
+    try {
+      // Goldener Rahmen
+      doc.setDrawColor(226, 192, 141); // Gold
+      doc.setLineWidth(border);
+      doc.rect(profileX - border / 2, profileY - border / 2, profileSize + border, profileSize + border, 'S');
+      // Profilbild
+      const dataUrl = await getProfileIconDataUrl(summonerInfo.profileIconId);
+      doc.addImage(dataUrl, 'PNG', profileX, profileY, profileSize, profileSize);
+    } catch (e) {
+      doc.text('Profile Icon: [Bild nicht gefunden]', profileX, profileY + profileSize + 8);
     }
-    y += 20;
   } else {
-    doc.text('Summoner Level: [Unknown]', 10, y);
-    y += 10;
-    doc.text('Profile Icon: [Unknown]', 10, y);
-    y += 20;
+    doc.text('Profile Icon: [Unknown]', profileX, profileY + profileSize + 8);
   }
 
-  // Add player details
+  // Name und Tag zentriert, groß
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(26);
+  const nameTag = riotId && riotId.gameName && riotId.tagLine
+    ? `${riotId.gameName}#${riotId.tagLine}`
+    : '[Unknown]';
+  doc.text(nameTag, pageWidth / 2, profileY + profileSize / 2 + 6, { align: 'center' });
+
+  // Summoner Level und Region rechts oben
   doc.setFont('Helvetica', 'normal');
-  doc.setFontSize(12);
-  if (playerData && playerData.puuid) {
-    doc.text(`Summoner Name: ${playerData.gameName || '[Unknown]'}`, 10, y);
-    y += 10;
-    doc.text(`Region: ${playerData.tagLine || '[Unknown]'}`, 10, y);
-    y += 10;
-  } else {
-    doc.text('Summoner Name: [Placeholder]', 10, y);
-    y += 10;
-    doc.text('Region: [Placeholder]', 10, y);
-    y += 10;
-  }
+  doc.setFontSize(13);
+  const infoX = pageWidth - 12;
+  doc.text(`Summoner Level: ${summonerInfo?.summonerLevel ?? '[Unknown]'}`, infoX, profileY + 8, { align: 'right' });
+  doc.text(`Region: ${playerData?.tagLine || '[Unknown]'}`, infoX, profileY + 18, { align: 'right' });
+
+  // fette schwarze Linie darunter
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(1.5);
+  doc.line(10, profileY + profileSize + 12, pageWidth - 10, profileY + profileSize + 12);
+
+  // y-Position für den weiteren Inhalt
+  let y = profileY + profileSize + 20;
 
   // Add league details (Rank, Wins, Losses)
   doc.setFont('Helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.text('Ranked Stats:', 10, y);
+  doc.setFontSize(18); // Schrift größer
+  doc.text('Ranked Stats', pageWidth / 2, y, { align: 'center' }); // zentriert
 
   doc.setFont('Helvetica', 'normal');
   doc.setFontSize(12);
-  let rankY = y + 10;
+  let rankY = y + 12;
 
   // Debug: Normal Stats ausgeben
   console.log('Normal Stats:', normalStats);
 
-  if (leagueDetails && leagueDetails.length > 0) {
-    for (const entry of leagueDetails) {
-      const wins = entry.wins ?? 0;
-      const losses = entry.losses ?? 0;
-      const total = wins + losses;
-      const winrate = total > 0 ? ((wins / total) * 100).toFixed(1) + '%' : '-';
-      doc.text(
-        `Queue: ${entry.queueType || '-'} | Rank: ${entry.tier || '-'} ${entry.rank || ''} | Wins: ${wins} | Losses: ${losses} | Winrate: ${winrate}`,
-        10,
-        rankY
-      );
-      // Rank-Icon anzeigen (rechts neben dem Text)
-      if (entry.tier) {
-        try {
-          const dataUrl = await getRankIconDataUrl(entry.tier);
-          doc.addImage(dataUrl, 'PNG', 120, rankY - 5, 15, 15);
-        } catch (e) {
-          // Icon nicht gefunden, ignoriere
-        }
-      }
-      rankY += 20;
+  function getQueueDisplayName(queueType) {
+    switch ((queueType || '').toUpperCase()) {
+      case 'RANKED_FLEX_SR':
+      case 'FLEX_SR':
+      case 'FLEX':
+        return 'Flex-Ranked';
+      case 'RANKED_SOLO_5X5':
+      case 'SOLO_5X5':
+      case 'SOLOQ':
+        return 'Solo-Ranked';
+      case 'RANKED_TFT':
+        return 'TFT-Ranked';
+      case 'NORMAL_DRAFT':
+        return 'Normal Draft';
+      case 'NORMAL':
+        return 'Normal';
+      default:
+        return queueType || '-';
     }
   }
-  // NEU: Normals anzeigen
-  if ((!leagueDetails || leagueDetails.length === 0) && (!normalStats || normalStats.games === 0)) {
-    doc.text('Keine Ranked- oder Normal-Daten gefunden.', 10, rankY);
-    rankY += 10;
+
+  const allQueues = [
+    { key: 'RANKED_FLEX_SR', label: 'Flex-Ranked' },
+    { key: 'RANKED_SOLO_5X5', label: 'Solo-Ranked' },
+    { key: 'RANKED_TFT', label: 'TFT-Ranked' }
+  ];
+
+  for (const queue of allQueues) {
+    const entry = (leagueDetails || []).find(e => (e.queueType || '').toUpperCase() === queue.key);
+    let wins = 0, losses = 0, tier = '', rank = '', winrate = '-', isUnrated = false;
+
+    if (entry) {
+      wins = entry.wins ?? 0;
+      losses = entry.losses ?? 0;
+      tier = entry.tier || '';
+      rank = entry.rank || '';
+      const total = wins + losses;
+      winrate = total > 0 ? ((wins / total) * 100).toFixed(1) + '%' : '-';
+      isUnrated = false;
+    } else {
+      isUnrated = true;
+    }
+
+    // Farben für die Ranks
+    const rankBgColors = {
+      IRON: [80, 80, 80],
+      BRONZE: [176, 141, 87],
+      SILVER: [180, 180, 200],
+      GOLD: [255, 215, 64],
+      PLATINUM: [64, 224, 208],
+      EMERALD: [80, 200, 120],
+      DIAMOND: [90, 155, 255],
+      MASTER: [186, 85, 211],
+      GRANDMASTER: [220, 20, 60],
+      CHALLENGER: [255, 215, 0]
+    };
+    const color = rankBgColors[(tier || '').toUpperCase()] || [55, 55, 55];
+
+    // Text
+    doc.setFontSize(15);
+    doc.setFont('Helvetica', 'bold');
+    const queueText = isUnrated
+      ? `${queue.label} | unranked`
+      : `${queue.label} | ${tier || '-'} ${rank || ''} | Wins: ${wins} | Losses: ${losses} | Winrate: ${winrate}`;
+
+    // Rahmen
+    const rankBoxX = 7;
+    const rankBoxY = rankY - 7;
+    const rankBoxWidth = 195;
+    doc.setDrawColor(color[0], color[1], color[2]);
+    doc.setLineWidth(1.2);
+    doc.rect(rankBoxX, rankBoxY, rankBoxWidth, 12, 'S');
+
+    // Text
+    doc.setTextColor(0, 0, 0);
+    doc.text(queueText, 10, rankY);
+
+    // Rank-Icon anzeigen (nur wenn vorhanden)
+    if (!isUnrated && tier) {
+      try {
+        const dataUrl = await getRankIconDataUrl(tier);
+        doc.addImage(dataUrl, 'PNG', 180, rankY - 9, 15, 15);
+      } catch (e) {
+        // Icon nicht gefunden, ignoriere
+      }
+    }
+    rankY += 20;
   }
 
-  // Add top 3 champions
+  // fette schwarze Linie darunter (wie oben)
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(1.5);
+  // Weniger Abstand: Linie direkt unter die letzte Box
+  doc.line(10, rankY + 1, pageWidth - 10, rankY + 1);
+
+  // Add top 3 champions (direkt unter die Linie)
+  const topChampionsY = rankY + 8; // Weniger Abstand
   doc.setFont('Helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.text('Top 3 Most-Played Champions:', 10, rankY + 20);
+  doc.setFontSize(18);
+  doc.text('Top 3 Most-Played Champions', pageWidth / 2, topChampionsY, { align: 'center' });
 
   doc.setFont('Helvetica', 'normal');
   doc.setFontSize(12);
 
   if (championMastery && championMastery.length > 0) {
-    const imgSize = 65;
+    // Bilder direkt unter die Überschrift
+    const imgY = topChampionsY + 6;
+    const imgWidth = 65; // Breite der Bilder in mm
+    const imgHeight = (imgWidth * 560) / 308; // Höhe basierend auf dem Verhältnis 308x560
     const margin = 10;
     const pageWidth = 210; // A4 width in mm for jsPDF
     const totalImgs = Math.min(3, championMastery.length);
     const totalSpace = pageWidth - 2 * margin;
-    const spaceBetween = 5;
-    const totalImgWidth = imgSize * totalImgs + spaceBetween * (totalImgs - 1);
+    const spaceBetween = 5; // Abstand zwischen den Bildern
+    const totalImgWidth = imgWidth * totalImgs + spaceBetween * (totalImgs - 1);
     const startX = margin + Math.floor((totalSpace - totalImgWidth) / 2);
 
     for (let i = 0; i < totalImgs; i++) {
       const champion = championMastery[i];
       const champName = getChampionNameById(champion.championId);
       const loadingImgUrl = `${import.meta.env.BASE_URL}assets/data/championloading/${champName}_0.jpg`;
+
       try {
         const response = await fetch(loadingImgUrl);
         const blob = await response.blob();
@@ -192,35 +250,37 @@ export const generatePlayerPDF = async (playerData, championMastery, leagueDetai
           reader.onloadend = () => resolve(reader.result);
           reader.readAsDataURL(blob);
         });
-        const x = startX + i * (imgSize + spaceBetween);
-        const yImg = rankY + 30;
-        doc.addImage(dataUrl, 'JPEG', x, yImg, imgSize, imgSize);
 
-        // Trennbalken (außer nach dem letzten Bild)
-        if (i < totalImgs - 1) {
-          doc.setDrawColor(180);
-          doc.setLineWidth(1);
-          doc.line(x + imgSize + spaceBetween / 2, yImg, x + imgSize + spaceBetween / 2, yImg + imgSize);
-        }
+        const x = startX + i * (imgWidth + spaceBetween);
+        const yImg = imgY +5;
 
-        // Champion-Infos unter das Bild schreiben
+        // Bild hinzufügen mit proportionaler Größe
+        doc.addImage(dataUrl, 'JPEG', x, yImg, imgWidth, imgHeight);
+
+        // Champion-Name zentriert über dem Bild
+        doc.setFont('Helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.text(champName, x + imgWidth / 2, yImg - 3, { align: 'center' });
+
+        // Punkte links unter dem Bild
         doc.setFont('Helvetica', 'normal');
-        doc.setFontSize(11);
-        doc.text(`${i + 1}. ${champName}`, x, yImg + imgSize + 8);
         doc.setFontSize(10);
-        doc.text(`Points: ${champion.championPoints}`, x, yImg + imgSize + 14);
-        doc.text(`Level: ${champion.championLevel}`, x, yImg + imgSize + 20);
+        doc.text(`Points: ${champion.championPoints}`, x, yImg + imgHeight + 4);
+
+        // Level rechts unter dem Bild
+        doc.text(`Level: ${champion.championLevel}`, x + imgWidth - 0, yImg + imgHeight + 4, { align: 'right' });
       } catch (e) {
         // Bild nicht gefunden, ignoriere
       }
     }
   } else {
-    doc.text('No champion mastery data available.', 10, rankY + 30);
+    doc.text('No champion mastery data available.', 10, topChampionsY + 30);
   }
 
-  // Add footer
+  // Add footer (nutze die oben deklarierten Variablen)
   doc.setFontSize(10);
-  doc.text('Generated by SummonerSheet.gg', 10, 280);
+  doc.text(timestamp, 10, 290);
+  doc.text('Generated by SummonerSheet.gg', 200, 290, { align: 'right' });
 
   const pdfBlob = doc.output('blob');
   return URL.createObjectURL(pdfBlob); // Return the Blob URL
