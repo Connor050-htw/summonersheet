@@ -1,3 +1,58 @@
+<template>
+  <div class="bg-move"></div>
+  <div class="page-scale">
+    <div class="container">
+      <h1 class="title krass-title">SummonerSheet</h1>
+      <div class="description-box">
+        <p>
+          <strong>What is this Website?</strong><br/>
+          Generate a beautiful PDF with the most important stats and information about your League of Legends account.<br />
+          You can share, download, or print the PDF to impress your friend!<br />
+        </p>
+      </div>
+      <div class="form">
+        <input
+          v-model="gameName"
+          class="input"
+          placeholder="Enter Summoner Name"
+          style="text-align: center;"
+          @keyup.enter="fetchAndGeneratePDF"
+        />
+        <input
+          v-model="tagLine"
+          class="input"
+          placeholder="Enter Tag Line"
+          style="text-align: center;"
+          @keyup.enter="fetchAndGeneratePDF"
+        />
+        <button @click="fetchAndGeneratePDF" class="button">Generate PDF</button>
+      </div>
+      <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
+      <div v-if="pdfPreviewUrl && !isLoading && hasGenerated" class="pdf-preview">
+        <h3>PDF Preview:</h3>
+        <iframe :src="pdfPreviewUrl" width="100%" height="942rem"></iframe>
+        <a
+          :href="pdfPreviewUrl"
+          :download="`${gameName || 'Summoner'}-${tagLine || 'Tag'}-SummonerSheet.pdf`"
+          class="button"
+          style="margin: 1rem auto 0 auto; display: block; max-width: 220px; text-align: center;"
+        >
+          Download PDF
+        </a>
+      </div>
+      <p class="legal">
+        SummonerSheet is not endorsed by Riot Games and does not reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games and all associated properties are trademarks or registered trademarks of Riot Games, Inc.
+      </p>
+    </div>
+  </div>
+  <div v-if="isLoading" class="loading-overlay">
+    <div class="spinner">
+      <div class="spinner-inner"></div>
+    </div>
+    <div class="loading-text">Generating PDF...</div>
+  </div>
+</template>
+
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
 import { getSummonerByName } from '../api/GetPlayerId';
@@ -8,8 +63,9 @@ import { getSummonerByPUUID } from '../api/GetSummonerByPUUID';
 import { generatePlayerPDF } from '../utils/pdfGenerator';
 import { getTftLeagueByPUUID } from '../api/GetTftLeagueByPUUID';
 
-const gameName = ref('MarFlow');
-const tagLine = ref('EUW');
+// Platzhalter für Summoner Name und Tag Line
+const gameName = ref('');
+const tagLine = ref('');
 const playerData = ref(null);
 const championMastery = ref(null);
 const leagueDetails = ref(null);
@@ -32,6 +88,7 @@ function wait(ms) {
 const fetchAndGeneratePDF = async () => {
   isLoading.value = true;
   hasGenerated.value = false;
+  let skipDelay = false;
   const start = Date.now();
   try {
     const data = await getSummonerByName(gameName.value, tagLine.value);
@@ -68,13 +125,21 @@ const fetchAndGeneratePDF = async () => {
     hasGenerated.value = true;
     errorMessage.value = '';
   } catch (error) {
-    errorMessage.value = 'Failed to fetch player data. Please try again.';
-  } finally {
-    const elapsed = Date.now() - start;
-    if (elapsed < 1500) {
-      await wait(1500 - elapsed);
+    if (error?.response?.status === 404) {
+      errorMessage.value = 'Player not found! Please check the name and tag line.';
+      isLoading.value = false;
+      return; // <--- WICHTIG: Sofort zurückkehren, damit finally nicht ausgeführt wird!
+    } else {
+      errorMessage.value = 'Failed to fetch player data. Please try again.';
     }
-    isLoading.value = false;
+  } finally {
+    if (isLoading.value) { // <--- Nur wenn noch geladen wird, Delay ausführen
+      const elapsed = Date.now() - start;
+      if (elapsed < 1500) {
+        await wait(1500 - elapsed);
+      }
+      isLoading.value = false;
+    }
   }
 };
 
@@ -90,6 +155,7 @@ function handleMouseMove(e) {
 }
 
 onMounted(() => {
+  //document.body.style.zoom = "85%";
   bgMoveEl = document.querySelector('.bg-move');
   window.addEventListener('mousemove', handleMouseMove);
 });
@@ -98,51 +164,11 @@ onUnmounted(() => {
 });
 </script>
 
-<template>
-  <div class="bg-move"></div>
-  <div class="container">
-    <h1 class="title krass-title">SummonerSheet</h1>
-    <div class="description-box">
-      <p>
-        <strong>What is this Website?</strong><br/>
-        Generate a beautiful PDF with the most important stats and information about your League of Legends account.<br />
-        You can share, download, or print the PDF to impress your friend!<br />
-      </p>
-    </div>
-    <div class="form">
-      <input
-        v-model="gameName"
-        class="input"
-        placeholder="Enter Summoner Name"
-        style="text-align: center;"
-      />
-      <input
-        v-model="tagLine"
-        class="input"
-        placeholder="Enter Tag Line"
-        style="text-align: center;"
-      />
-      <button @click="fetchAndGeneratePDF" class="button">Generate PDF</button>
-    </div>
-    <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
-    <!-- PDF Preview nur anzeigen, wenn pdfPreviewUrl gesetzt ist UND nicht im Initialzustand -->
-    <div v-if="pdfPreviewUrl && !isLoading && hasGenerated" class="pdf-preview">
-      <h3>PDF Preview:</h3>
-      <iframe :src="pdfPreviewUrl" width="100%" height="1178rem"></iframe>
-    </div>
-    <div v-if="isLoading" class="loading-overlay">
-      <div class="spinner">
-        <div class="spinner-inner"></div>
-      </div>
-      <div class="loading-text">Generating PDF...</div>
-    </div>
-    <p class="legal">
-      SummonerSheet is not endorsed by Riot Games and does not reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games and all associated properties are trademarks or registered trademarks of Riot Games, Inc.
-    </p>
-  </div>
-</template>
-
 <style scoped>
+:root {
+  font-size: 80%;
+}
+
 .bg-move {
   position: fixed;
   top: 0;
@@ -156,30 +182,37 @@ onUnmounted(() => {
   pointer-events: none;
 }
 
+.page-scale {
+  /* transform: scale(0.9); */
+  /* transform-origin: top center; */
+  width: 100%;
+}
+
 .container {
   position: relative;
   z-index: 1;
   font-family: 'Roboto', sans-serif;
   background: linear-gradient(135deg, #1a1a1a, #2c2c2c);
   color: #e2c08d;
-  padding: 2rem;
+  padding: 1.6rem;           /* vorher: 2rem */
   border-radius: 10px;
-  width: 50rem;
-  margin: 2rem auto;
+  width: 100%;
+  max-width: 41.6rem;        /* vorher: 52rem */
+  margin: 1.6rem auto;       /* vorher: 2rem */
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+  /* transform: scale(0.9);  <-- ENTFERNEN */
 }
 
 .title {
-  font-size: 2.5rem;
+  font-size: 2rem;           /* vorher: 2.5rem */
   text-align: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.2rem;     /* vorher: 1.5rem */
   color: #f4e4c1;
 }
 
 .krass-title {
-  font-size: 3rem;
-  text-align: center;
-  margin-bottom: 1.5rem;
+  font-size: 2.4rem;         /* vorher: 3rem */
+  margin-bottom: 1.2rem;     /* vorher: 1.5rem */
   background: linear-gradient(90deg, #e2c08d 0%, #f4e4c1 100%);
   background-size: 100% auto;
   color: #2a210a; /* Deutlich kontrastreicher als #b89b5e */
@@ -239,9 +272,9 @@ onUnmounted(() => {
   border-radius: 8px;
   background: rgba(244, 228, 193, 0.07);
   color: #f4e4c1;
-  padding: 1.2em 1.5em;
-  margin-bottom: 2em;
-  font-size: 1.1em;
+  padding: 1em 1.2em;        /* vorher: 1.2em 1.5em */
+  margin-bottom: 1.6em;      /* vorher: 2em */
+  font-size: 0.88em;         /* vorher: 1.1em */
   text-align: center;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
@@ -254,17 +287,17 @@ onUnmounted(() => {
 .form {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  margin-bottom: 2rem;
+  gap: 0.8rem;               /* vorher: 1rem */
+  margin-bottom: 1.6rem;     /* vorher: 2rem */
 }
 
 .input {
-  padding: 0.8rem;
+  padding: 0.64rem;          /* vorher: 0.8rem */
   border: 2px solid #e2c08d;
   border-radius: 5px;
   background: #1a1a1a;
   color: #f4e4c1;
-  font-size: 1rem;
+  font-size: 0.8rem;         /* vorher: 1rem */
 }
 
 .input::placeholder {
@@ -272,12 +305,12 @@ onUnmounted(() => {
 }
 
 .button {
-  padding: 0.8rem;
+  padding: 0.64rem;          /* vorher: 0.8rem */
   border: none;
   border-radius: 10px;
   background: linear-gradient(270deg, #e2c08d 0%, #f4e4c1 100%);
   color: #2a210a;
-  font-size: 1rem;
+  font-size: 0.8rem;         /* vorher: 1rem */
   font-weight: 700;
   cursor: pointer;
   transition: box-shadow 0.3s, background 0.3s;
@@ -318,7 +351,7 @@ onUnmounted(() => {
 }
 
 .pdf-preview {
-  margin-top: 2rem;
+  margin-top: 1.6rem;        /* vorher: 2rem */
   border: 2px solid #e2c08d;
   border-radius: 5px;
   overflow: hidden;
@@ -385,5 +418,82 @@ onUnmounted(() => {
   font-size: 0.9rem;
   color: #a89c7c;
   text-align: center;
+}
+
+@media (max-width: 600px) {
+  .container {
+    padding: 0.5rem;
+    max-width: 100vw;
+    border-radius: 10px; /* vorher: 0; jetzt wieder abgerundet */
+    margin: 0;
+    box-shadow: none;
+  }
+
+  .title,
+  .krass-title {
+    font-size: 1.3rem;
+    padding: 0.2em 0;
+  }
+
+  .description-box {
+    font-size: 0.95em;
+    padding: 0.7em 0.5em;
+    margin-bottom: 1em;
+  }
+
+  .form {
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .input,
+  .button {
+    font-size: 1rem;
+    padding: 0.7rem;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .pdf-preview {
+    margin-top: 1rem;
+    border-width: 1px;
+    border-radius: 3px;
+    padding: 0;
+  }
+
+  .pdf-preview iframe {
+    min-width: 100vw;
+    width: 100vw;
+    height: 60vh;
+    display: block;
+    border: none;
+  }
+
+  .loading-overlay {
+    font-size: 1rem;
+    padding: 0;
+  }
+
+  .spinner {
+    width: 48px;
+    height: 48px;
+    border-width: 4px;
+    margin-bottom: 1rem;
+  }
+
+  .spinner-inner {
+    top: 8px; left: 8px;
+    width: 16px; height: 16px;
+  }
+
+  .loading-text {
+    font-size: 1rem;
+  }
+
+  .legal {
+    font-size: 0.75rem;
+    margin-top: 1rem;
+    padding: 0 0.5rem;
+  }
 }
 </style>

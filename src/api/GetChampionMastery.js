@@ -12,7 +12,7 @@ const riotApi = axios.create({
 export const getChampionMasteryByPUUID = async (puuid) => {
   try {
     const response = await riotApi.get(`/lol/champion-mastery/v4/champion-masteries/by-puuid/${puuid}`);
-    console.log(response.data);
+    ////console.log(response.data);
     return response.data;
   } catch (error) {
     console.error('Error fetching champion mastery data:', error.message);

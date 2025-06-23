@@ -118,7 +118,7 @@ export const generatePlayerPDF = async (playerData, championMastery, leagueDetai
   let rankY = y + 12;
 
   // Debug: Normal Stats ausgeben
-  console.log('Normal Stats:', normalStats);
+  //console.log('Normal Stats:', normalStats);
 
   function getQueueDisplayName(queueType) {
     switch ((queueType || '').toUpperCase()) {
