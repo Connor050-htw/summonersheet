@@ -32,7 +32,7 @@ The API key has to be activated (needs to be refreshed every 24h): https://devel
 
 # ------------
 
-To deploy the website: 'npm run deploy' and set github-pages on the correct branch 'gh-pages/root'
+To deploy the website: 'npm run build' -> 'npm run deploy' and set github-pages on the correct branch 'gh-pages/root'
 
 # --- ideas: ------------------------------------------
 
