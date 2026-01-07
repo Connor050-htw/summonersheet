@@ -3,8 +3,8 @@ import { API_KEY } from './config';
 
 const riotApi = axios.create({
   baseURL: 'https://euw1.api.riotgames.com',
-  params: {
-    api_key: API_KEY,
+  headers: {
+    'X-Riot-Token': API_KEY,
   },
 });
 

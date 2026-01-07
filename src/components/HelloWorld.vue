@@ -61,7 +61,7 @@ import { getPlayerDetailsByPUUID } from '../api/GetPlayerDetails';
 import { getRiotIdByPUUID } from '../api/GetRiotIdByPUUID';
 import { getSummonerByPUUID } from '../api/GetSummonerByPUUID';
 import { generatePlayerPDF } from '../utils/pdfGenerator';
-import { getTftLeagueByPUUID } from '../api/GetTftLeagueByPUUID';
+// import { getTftLeagueByPUUID } from '../api/GetTftLeagueByPUUID';
 
 // Platzhalter für Summoner Name und Tag Line
 const gameName = ref('');
@@ -98,12 +98,12 @@ const fetchAndGeneratePDF = async () => {
     championMastery.value = masteryData;
 
     const leagueData = await getPlayerDetailsByPUUID(data.puuid);
-    const tftLeagueData = await getTftLeagueByPUUID(data.puuid);
+    // const tftLeagueData = await getTftLeagueByPUUID(data.puuid);
 
-    // Kombiniere alle League-Daten (Solo, Flex, TFT)
+    // Kombiniere alle League-Daten (Solo, Flex) - TFT auskommentiert
     const allLeagueDetails = [
       ...(leagueData || []),
-      ...(tftLeagueData || [])
+      // ...(tftLeagueData || [])
     ];
 
     leagueDetails.value = allLeagueDetails;

@@ -115,7 +115,7 @@ export const generatePlayerPDF = async (playerData, championMastery, leagueDetai
 
   doc.setFont('Helvetica', 'normal');
   doc.setFontSize(12);
-  let rankY = y + 12;
+  let rankY = y + 22;
 
   // Debug: Normal Stats ausgeben
   //console.log('Normal Stats:', normalStats);
@@ -144,7 +144,7 @@ export const generatePlayerPDF = async (playerData, championMastery, leagueDetai
   const allQueues = [
     { key: 'RANKED_FLEX_SR', label: 'Flex-Ranked' },
     { key: 'RANKED_SOLO_5X5', label: 'Solo-Ranked' },
-    { key: 'RANKED_TFT', label: 'TFT-Ranked' }
+    //{ key: 'RANKED_TFT', label: 'TFT-Ranked' }
   ];
 
   for (const queue of allQueues) {
