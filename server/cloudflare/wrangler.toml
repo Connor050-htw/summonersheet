@@ -1,0 +1,7 @@
+name = "summonersheet-proxy"
+main = "worker.js"
+compatibility_date = "2024-09-01"
+
+# Optional: allow your GitHub Pages origin at runtime via env var
+[vars]
+ALLOWED_ORIGIN = "https://connor050-htw.github.io"

@@ -1,17 +1,11 @@
-import axios from 'axios';
-import { API_KEY } from './config';
-
-const riotApi = axios.create({
-  baseURL: 'https://euw1.api.riotgames.com',
-  headers: {
-    'X-Riot-Token': API_KEY,
-  },
-});
+import api from './http';
 
 // Fetch champion mastery data using PUUID
 export const getChampionMasteryByPUUID = async (puuid) => {
   try {
-    const response = await riotApi.get(`/lol/champion-mastery/v4/champion-masteries/by-puuid/${puuid}`);
+    const response = await api.get('/api/lol/champion-mastery/by-puuid', {
+      params: { puuid }
+    });
     ////console.log(response.data);
     return response.data;
   } catch (error) {

@@ -1,12 +1,4 @@
-import axios from 'axios';
-import { API_KEY } from './config';
-
-const riotApi = axios.create({
-  baseURL: 'https://europe.api.riotgames.com',
-  headers: {
-    'X-Riot-Token': API_KEY,
-  },
-});
+import api from './http';
 
 // Gibt die Stats der letzten 100 Normal Games zurück
 export const getNormalStatsByPUUID = async (puuid) => {
@@ -16,14 +8,14 @@ export const getNormalStatsByPUUID = async (puuid) => {
   let losses = 0;
 
   // 1. Match-IDs holen (nur Draft Pick, nur 5)
-  const matchIdsResp = await riotApi.get(`/lol/match/v5/matches/by-puuid/${puuid}/ids`, {
-    params: { start: 0, count: 5, queue: normalQueueId },
+  const matchIdsResp = await api.get('/api/lol/match/ids', {
+    params: { puuid, start: 0, count: 5, queue: normalQueueId },
   });
   const matchIds = matchIdsResp.data;
 
   // 2. Matches holen und auswerten
   for (const matchId of matchIds) {
-    const matchResp = await riotApi.get(`/lol/match/v5/matches/${matchId}`);
+    const matchResp = await api.get(`/api/lol/match/by-id/${matchId}`);
     const match = matchResp.data;
     if (match.info.queueId !== normalQueueId) continue;
 

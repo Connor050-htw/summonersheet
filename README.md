@@ -34,6 +34,21 @@ The API key has to be activated (needs to be refreshed every 24h): https://devel
 
 To deploy the website: 'npm run build' -> 'npm run deploy' and set github-pages on the correct branch 'gh-pages/root'
 
+# ------------
+
+## Cloudflare Worker Proxy 
+
+Auf Cloudware ist der Worker mit der Riot-API aktiv.
+Dieser ist immer in der .env erreichbar. 
+Um diesen zu aktualisieren:
+
+```bash
+cd server/cloudflare
+npx wrangler secret put RIOT_API_KEY
+npx wrangler deploy
+```
+
+
 # --- ideas: ------------------------------------------
 
 -button to share the pdf directly in social media

@@ -23,5 +23,10 @@ dist-ssr
 *.sln
 *.sw?
 
-# Exclude config.js to keep the API key private
-src/api/config.js
+# Environment variables (local config)
+.env
+.env.local
+.env.production
+
+# Keep .env.example as template
+!.env.example
