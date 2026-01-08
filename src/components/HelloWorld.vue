@@ -18,13 +18,33 @@
           style="text-align: center;"
           @keyup.enter="fetchAndGeneratePDF"
         />
-        <input
-          v-model="tagLine"
-          class="input"
-          placeholder="Enter Tag Line"
-          style="text-align: center;"
-          @keyup.enter="fetchAndGeneratePDF"
-        />
+        <div class="form-row">
+          <input
+            v-model="tagLine"
+            class="input"
+            placeholder="Enter Tag Line"
+            style="text-align: center;"
+            @keyup.enter="fetchAndGeneratePDF"
+          />
+          <button 
+            v-if="snapshots.length === 0"
+            @click="loadSnapshots" 
+            class="button button-secondary" 
+            :disabled="isLoadingSnapshots"
+          >
+            <span v-if="isLoadingSnapshots" class="button-spinner"></span>
+            <span v-else>Select Date</span>
+          </button>
+          <div v-else class="date-picker-inline">
+            <select v-model="selectedSnapshot" class="input">
+              <option value="today">Today (Latest)</option>
+              <option v-for="snapshot in snapshots" :key="snapshot.recorded_at" :value="snapshot.recorded_at">
+                {{ formatDate(snapshot.recorded_at) }}
+              </option>
+            </select>
+            <button @click="resetSnapshots" class="button-reset" title="Reset Date Selection">×</button>
+          </div>
+        </div>
         <button @click="fetchAndGeneratePDF" class="button">Generate PDF</button>
       </div>
       <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
@@ -60,6 +80,7 @@ import { getChampionMasteryByPUUID } from '../api/GetChampionMastery';
 import { getPlayerDetailsByPUUID } from '../api/GetPlayerDetails';
 import { getRiotIdByPUUID } from '../api/GetRiotIdByPUUID';
 import { getSummonerByPUUID } from '../api/GetSummonerByPUUID';
+import { getPlayerSnapshots, getSummonerStatsByDate } from '../db/players';
 import { generatePlayerPDF } from '../utils/pdfGenerator';
 // import { getTftLeagueByPUUID } from '../api/GetTftLeagueByPUUID';
 
@@ -74,7 +95,55 @@ const summonerInfo = ref(null);
 const errorMessage = ref('');
 const pdfPreviewUrl = ref(null);
 const isLoading = ref(false); // <-- Neu hinzugefügt
+const isLoadingSnapshots = ref(false); // Loading nur für Snapshots
 const hasGenerated = ref(false);
+const snapshots = ref([]);
+const selectedSnapshot = ref('today');
+
+// Format Datum für Anzeige
+function formatDate(dateString) {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', { 
+    month: 'short', 
+    day: 'numeric', 
+    year: 'numeric'
+  });
+}
+
+// Lade Snapshots aus der DB
+const loadSnapshots = async () => {
+  errorMessage.value = '';
+  if (!gameName.value || !tagLine.value) {
+    errorMessage.value = 'Please enter both Summoner Name and Tag Line first.';
+    return;
+  }
+
+  try {
+    isLoadingSnapshots.value = true;
+    const data = await getSummonerByName(gameName.value, tagLine.value);
+    const loadedSnapshots = await getPlayerSnapshots(data.puuid);
+    snapshots.value = loadedSnapshots;
+    
+    if (loadedSnapshots.length === 0) {
+      errorMessage.value = 'No historic data found for this player yet.';
+    }
+  } catch (error) {
+    if (error?.response?.status === 404) {
+      errorMessage.value = 'Player not found! Please check the name and tag line.';
+    } else {
+      errorMessage.value = 'Failed to load snapshots. Please try again.';
+    }
+  } finally {
+    isLoadingSnapshots.value = false;
+  }
+}
+
+// Reset Snapshots (zurück zum "Select Date" Button)
+const resetSnapshots = () => {
+  snapshots.value = [];
+  selectedSnapshot.value = 'today';
+  errorMessage.value = '';
+}
 
 // Generate a placeholder PDF on component load
 onMounted(async () => {
@@ -111,8 +180,20 @@ const fetchAndGeneratePDF = async () => {
     const riotIdData = await getRiotIdByPUUID(data.puuid);
     riotId.value = riotIdData;
 
-    const summonerData = await getSummonerByPUUID(data.puuid);
-    summonerInfo.value = summonerData;
+    let summonerData;
+    if (selectedSnapshot.value === 'today') {
+      // Aktuelle Daten
+      summonerData = await getSummonerByPUUID(data.puuid);
+      summonerInfo.value = summonerData;
+    } else {
+      // Historische Daten
+      const historicalStats = await getSummonerStatsByDate(data.puuid, selectedSnapshot.value);
+      summonerData = {
+        summonerLevel: historicalStats?.summoner_level,
+        profileIconId: historicalStats?.profile_icon_id
+      };
+      summonerInfo.value = summonerData;
+    }
 
     pdfPreviewUrl.value = await generatePlayerPDF(
       playerData.value,
@@ -124,6 +205,7 @@ const fetchAndGeneratePDF = async () => {
     );
     hasGenerated.value = true;
     errorMessage.value = '';
+    selectedSnapshot.value = 'today'; // Reset nach erfolgreicher Generierung
   } catch (error) {
     if (error?.response?.status === 404) {
       errorMessage.value = 'Player not found! Please check the name and tag line.';
@@ -291,6 +373,19 @@ onUnmounted(() => {
   margin-bottom: 1.6rem;     /* vorher: 2rem */
 }
 
+.form-row {
+  display: flex;
+  gap: 0.8rem;
+}
+
+.form-row input {
+  flex: 1;
+}
+
+.form-row button {
+  flex: 1;
+}
+
 .input {
   padding: 0.64rem;          /* vorher: 0.8rem */
   border: 2px solid #e2c08d;
@@ -302,6 +397,56 @@ onUnmounted(() => {
 
 .input::placeholder {
   color: #a89c7c;
+}
+
+.date-picker-inline {
+  flex: 1;
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.date-picker-inline select {
+  flex: 1;
+}
+
+.button-reset {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 2px solid #e2c08d;
+  border-radius: 5px;
+  background: rgba(226, 192, 141, 0.1);
+  color: #e2c08d;
+  font-size: 1.5rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.button-reset:hover {
+  background: rgba(226, 192, 141, 0.2);
+  transform: scale(1.1);
+}
+
+.date-picker-box {
+  border: 2px solid #e2c08d;
+  border-radius: 8px;
+  background: rgba(244, 228, 193, 0.05);
+  padding: 0.8rem;
+  margin-bottom: 0.4rem;
+}
+
+.date-picker-box label {
+  display: block;
+  color: #e2c08d;
+  font-size: 0.75rem;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
 }
 
 .button {
@@ -338,6 +483,31 @@ onUnmounted(() => {
 .button:hover::after {
   left: 120%;
   transition: left 0.7s;
+}
+
+.button-secondary {
+  background: linear-gradient(270deg, #8b7355 0%, #a89c7c 100%);
+  color: #2a210a;
+  box-shadow: 0 2px 8px 0 #8b735522;
+}
+
+.button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.button-spinner {
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.6rem;
+  border: 2px solid rgba(42, 33, 10, 0.3);
+  border-top-color: #2a210a;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .button:hover {
