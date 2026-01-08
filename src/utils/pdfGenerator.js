@@ -7,15 +7,16 @@ function getChampionNameById(id) {
   const champions = championDataRaw.data;
   for (const champName in champions) {
     if (champions[champName].key === champKey) {
-      return champions[champName].name;
+      return champName; // Internal ID (z.B. "MasterYi", "MonkeyKing")
     }
   }
-  return `[ID: ${id}]`;
+  return null; // Gibt null zurück wenn nicht gefunden
 }
 
 // Hilfsfunktion: Bild als DataURL laden
 async function getProfileIconDataUrl(profileIconId) {
-  const url = `${import.meta.env.BASE_URL}assets/data/profileicon/${profileIconId}.png`;
+  // Community Dragon hat bessere CORS-Unterstützung
+  const url = `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/profile-icons/${profileIconId}.jpg`;
   const response = await fetch(url);
   const blob = await response.blob();
   return await new Promise((resolve) => {
@@ -25,25 +26,11 @@ async function getProfileIconDataUrl(profileIconId) {
   });
 }
 
-// Mapping von Riot-Tier zu Dateinamen (deutsche Namen)
-const rankIconMap = {
-  IRON: 'Iron.png',
-  BRONZE: 'Bronze.png',
-  SILVER: 'Silver.png',
-  GOLD: 'Gold.png',
-  PLATINUM: 'Platinum.png',
-  EMERALD: 'Emerald.png',
-  DIAMOND: 'Diamond.png',
-  MASTER: 'Master.png',
-  GRANDMASTER: 'GrandMaster.png',
-  CHALLENGER: 'Challenger.png',
-};
-
 async function getRankIconDataUrl(tier) {
   if (!tier) return null;
-  const filename = rankIconMap[tier.toUpperCase()];
-  if (!filename) return null;
-  const url = `${import.meta.env.BASE_URL}assets/data/rankicon/${filename}`;
+  const tierLower = tier.toLowerCase();
+  // Rank Icons von Community Dragon CDN
+  const url = `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-mini-crests/${tierLower}.png`;
   const response = await fetch(url);
   const blob = await response.blob();
   return await new Promise((resolve) => {
@@ -239,39 +226,57 @@ export const generatePlayerPDF = async (playerData, championMastery, leagueDetai
 
     for (let i = 0; i < totalImgs; i++) {
       const champion = championMastery[i];
-      const champName = getChampionNameById(champion.championId);
-      const loadingImgUrl = `${import.meta.env.BASE_URL}assets/data/championloading/${champName}_0.jpg`;
-
-      try {
-        const response = await fetch(loadingImgUrl);
-        const blob = await response.blob();
-        const dataUrl = await new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.readAsDataURL(blob);
-        });
-
-        const x = startX + i * (imgWidth + spaceBetween);
-        const yImg = imgY +5;
-
-        // Bild hinzufügen mit proportionaler Größe
-        doc.addImage(dataUrl, 'JPEG', x, yImg, imgWidth, imgHeight);
-
-        // Champion-Name zentriert über dem Bild
-        doc.setFont('Helvetica', 'bold');
-        doc.setFontSize(12);
-        doc.text(champName, x + imgWidth / 2, yImg - 3, { align: 'center' });
-
-        // Punkte links unter dem Bild
-        doc.setFont('Helvetica', 'normal');
-        doc.setFontSize(10);
-        doc.text(`Points: ${champion.championPoints}`, x, yImg + imgHeight + 4);
-
-        // Level rechts unter dem Bild
-        doc.text(`Level: ${champion.championLevel}`, x + imgWidth - 0, yImg + imgHeight + 4, { align: 'right' });
-      } catch (e) {
-        // Bild nicht gefunden, ignoriere
+      const champId = getChampionNameById(champion.championId); // Internal ID
+      
+      const x = startX + i * (imgWidth + spaceBetween);
+      const yImg = imgY + 5;
+      
+      // Champion-Name zentriert über dem Bild (Display-Name)
+      let displayName = 'Unknown';
+      if (champId) {
+        displayName = championDataRaw.data[champId]?.name || champId;
+      } else {
+        // Wenn Champion nicht in JSON, fallback zu championId
+        displayName = `Champion #${champion.championId}`;
       }
+      
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text(displayName, x + imgWidth / 2, yImg - 3, { align: 'center' });
+      
+      // Versuche Bild zu laden (nur wenn champId existiert)
+      let imageLoaded = false;
+      if (champId) {
+        try {
+          const loadingImgUrl = `${import.meta.env.BASE_URL}assets/data/championloading/${champId}_0.jpg`;
+          const response = await fetch(loadingImgUrl);
+          
+          if (response.ok) {
+            const blob = await response.blob();
+            const dataUrl = await new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result);
+              reader.readAsDataURL(blob);
+            });
+            
+            // Bild hinzufügen mit proportionaler Größe
+            doc.addImage(dataUrl, 'JPEG', x, yImg, imgWidth, imgHeight);
+            imageLoaded = true;
+          }
+        } catch (e) {
+          // Bild nicht gefunden - ignoriere
+        }
+      }
+      
+      // IMMER die Punkte und Level zeigen, egal ob Bild geladen wurde
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(10);
+      
+      // Wenn Bild nicht geladen, zeige Stats etwas höher
+      const statsY = imageLoaded ? yImg + imgHeight + 4 : yImg + 15;
+      
+      doc.text(`Points: ${champion.championPoints}`, x, statsY);
+      doc.text(`Level: ${champion.championLevel}`, x + imgWidth - 0, statsY, { align: 'right' });
     }
   } else {
     doc.text('No champion mastery data available.', 10, topChampionsY + 30);

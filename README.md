@@ -48,8 +48,14 @@ npx wrangler secret put RIOT_API_KEY
 npx wrangler deploy
 ```
 
+# --- todo: ------------------------------------------
+
+- db fertig stellen
+- dateien updtodate halten durch github action...?
+- Loginfunktion
+- db key über cloudflare deployn
 
 # --- ideas: ------------------------------------------
 
--button to share the pdf directly in social media
+- button to share the pdf directly in social media
 -
