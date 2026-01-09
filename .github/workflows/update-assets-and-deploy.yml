@@ -39,18 +39,28 @@ jobs:
           
           BASE_URL="https://ddragon.leagueoflegends.com/cdn/${{ steps.version.outputs.version }}"
           
-          echo "Downloading champion splash arts..."
-          curl -s "${BASE_URL}/img/champion/" | grep -oP '(?<=href=")[^"]*\.png' | while read file; do
-            curl -s -o "public/assets/data/championloading/$file" "${BASE_URL}/img/champion/$file"
-          done
+          echo "Downloading dragontail archive..."
+          wget -q -O /tmp/dragontail.tgz "${BASE_URL%/cdn*}/cdn/dragontail-${{ steps.version.outputs.version }}.tgz"
+          tar -xzf /tmp/dragontail.tgz -C /tmp/
           
-          echo "Downloading profile icons..."
-          curl -s "${BASE_URL}/img/profileicon/" | grep -oP '(?<=href=")[^"]*\.png' | while read file; do
-            curl -s -o "public/assets/data/profileicon/$file" "${BASE_URL}/img/profileicon/$file"
-          done
+          echo "Extracting champion splash arts..."
+          if [ -d /tmp/dragontail-${{ steps.version.outputs.version }}/img/champion ]; then
+            cp /tmp/dragontail-${{ steps.version.outputs.version }}/img/champion/*.png public/assets/data/championloading/ 2>/dev/null || echo "No champion images found"
+          fi
           
-          echo "Downloading champion metadata..."
-          curl -s "${BASE_URL}/data/en_US/champion.json" -o public/assets/data/championFull.json
+          echo "Extracting profile icons..."
+          if [ -d /tmp/dragontail-${{ steps.version.outputs.version }}/img/profileicon ]; then
+            cp /tmp/dragontail-${{ steps.version.outputs.version }}/img/profileicon/*.png public/assets/data/profileicon/ 2>/dev/null || echo "No profile icons found"
+          fi
+          
+          echo "Extracting champion metadata..."
+          if [ -f /tmp/dragontail-${{ steps.version.outputs.version }}/data/en_US/champion.json ]; then
+            cp /tmp/dragontail-${{ steps.version.outputs.version }}/data/en_US/champion.json public/assets/data/championFull.json
+          fi
+          
+          echo "Download complete. Files:"
+          ls -la public/assets/data/championloading/ | head -5
+          ls -la public/assets/data/profileicon/ | head -5
       
       - name: Install dependencies
         run: npm ci
