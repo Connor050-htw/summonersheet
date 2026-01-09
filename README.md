@@ -51,9 +51,7 @@ npx wrangler deploy
 # --- todo: ------------------------------------------
 
 - db fertig stellen
-- dateien updtodate halten durch github action...?
 - Loginfunktion
-- db key über cloudflare deployn
 
 # --- ideas: ------------------------------------------
 
