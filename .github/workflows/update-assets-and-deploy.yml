@@ -36,51 +36,45 @@ jobs:
         run: |
           mkdir -p public/assets/data/championloading
           mkdir -p public/assets/data/profileicon
+          mkdir -p /tmp/ddextract
           
           echo "Downloading dragontail archive..."
           wget -q -O /tmp/dragontail.tgz "https://ddragon.leagueoflegends.com/cdn/dragontail-${{ steps.version.outputs.version }}.tgz"
           
-          echo "Extracting (with --no-same-owner)..."
-          tar --no-same-owner -xzf /tmp/dragontail.tgz -C /tmp/
+          echo "Extracting..."
+          cd /tmp/ddextract
+          tar -xzf /tmp/dragontail.tgz
+          cd -
           
           echo "=== Archive structure ==="
-          find /tmp -maxdepth 3 -type d | grep -E "(img|profileicon|champion|loading|data)" | sort
+          find /tmp/ddextract -maxdepth 3 -type d | head -20
           
           echo ""
           echo "=== Copying assets ==="
           
-          # Try all possible paths for splash arts
-          for path in "/tmp/img/champion/loading" "/tmp/dragontail-${{ steps.version.outputs.version }}/img/champion/loading" "/tmp/${{ steps.version.outputs.version }}/img/champion/loading"; do
-            if [ -d "$path" ]; then
-              echo "Found splash arts at: $path"
-              cp "$path"/* public/assets/data/championloading/ 2>/dev/null || true
-              break
-            fi
-          done
+          # Champion loading splash arts
+          if [ -d /tmp/ddextract/img/champion/loading ]; then
+            echo "Found splash arts"
+            cp /tmp/ddextract/img/champion/loading/* public/assets/data/championloading/
+          fi
           
-          # Try all possible paths for profile icons
-          for path in "/tmp/img/profileicon" "/tmp/${{ steps.version.outputs.version }}/img/profileicon" "/tmp/dragontail-${{ steps.version.outputs.version }}/img/profileicon"; do
-            if [ -d "$path" ]; then
-              echo "Found profile icons at: $path"
-              cp "$path"/* public/assets/data/profileicon/ 2>/dev/null || true
-              break
-            fi
-          done
+          # Profile icons
+          if [ -d "/tmp/ddextract/${{ steps.version.outputs.version }}/img/profileicon" ]; then
+            echo "Found profile icons"
+            cp "/tmp/ddextract/${{ steps.version.outputs.version }}/img/profileicon"/* public/assets/data/profileicon/
+          fi
           
-          # Try all possible paths for champion.json
-          for path in "/tmp/${{ steps.version.outputs.version }}/data/en_US/champion.json" "/tmp/data/en_US/champion.json" "/tmp/dragontail-${{ steps.version.outputs.version }}/data/en_US/champion.json"; do
-            if [ -f "$path" ]; then
-              echo "Found champion.json at: $path"
-              cp "$path" public/assets/data/championFull.json
-              break
-            fi
-          done
+          # Champion metadata
+          if [ -f "/tmp/ddextract/${{ steps.version.outputs.version }}/data/en_US/champion.json" ]; then
+            echo "Found champion.json"
+            cp "/tmp/ddextract/${{ steps.version.outputs.version }}/data/en_US/champion.json" public/assets/data/championFull.json
+          fi
           
           echo ""
-          echo "=== File counts ==="
+          echo "=== Results ==="
           echo "  Champion loading: $(ls public/assets/data/championloading/ 2>/dev/null | wc -l)"
           echo "  Profile icons: $(ls public/assets/data/profileicon/ 2>/dev/null | wc -l)"
-          echo "  championFull.json exists: $([ -f public/assets/data/championFull.json ] && echo 'yes' || echo 'no')"
+          echo "  championFull.json: $([ -f public/assets/data/championFull.json ] && echo 'yes' || echo 'no')"
           
           echo "Download complete. Files:"
           ls -la public/assets/data/championloading/ | head -5
