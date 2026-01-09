@@ -166,6 +166,70 @@ export default {
         return supaResp;
       }
 
+      // Insert champion stats snapshot
+      if (url.pathname === '/api/db/champion-stats/save' && req.method === 'POST') {
+        const body = await req.json().catch(() => null);
+        if (!body || !body.playerId || !body.championMasteryData) {
+          return new Response(JSON.stringify({ error: 'Missing fields: playerId, championMasteryData' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        const dateOnly = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+        const masteryArray = Array.isArray(body.championMasteryData) ? body.championMasteryData : [body.championMasteryData];
+
+        // Sort by points descending and take top 3 only
+        const top3 = masteryArray
+          .sort((a, b) => (b.championPoints || 0) - (a.championPoints || 0))
+          .slice(0, 3);
+        
+        // Create payload for top 3 champions with only DB fields
+        const payload = top3.map(champ => ({
+          player_id: Number(body.playerId),
+          champion_id: Number(champ.championId),
+          champion_level: Number(champ.championLevel),
+          champion_points: Number(champ.championPoints),
+          recorded_at: dateOnly,
+        }));
+
+        // Upsert per day per player per champion
+        return supaFetch('/champion_stats?on_conflict=player_id,champion_id,recorded_at', {
+          method: 'POST',
+          headers: {
+            Prefer: 'resolution=merge-duplicates,return=representation',
+          },
+          body: JSON.stringify(payload),
+        });
+      }
+
+      // Insert rank stats snapshot
+      if (url.pathname === '/api/db/rank-stats/save' && req.method === 'POST') {
+        const body = await req.json().catch(() => null);
+        if (!body || !body.playerId || !body.rankedData) {
+          return new Response(JSON.stringify({ error: 'Missing fields: playerId, rankedData' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        const dateOnly = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+        const rankedArray = Array.isArray(body.rankedData) ? body.rankedData : [body.rankedData];
+
+        // Create payload with only DB fields
+        const payload = rankedArray.map(rank => ({
+          player_id: Number(body.playerId),
+          queue_type: rank.queueType,
+          tier: rank.tier || null,
+          rank: rank.rank || null,
+          wins: rank.wins != null ? Number(rank.wins) : 0,
+          losses: rank.losses != null ? Number(rank.losses) : 0,
+          winrate: rank.wins + rank.losses > 0 ? Math.round((rank.wins / (rank.wins + rank.losses)) * 100) : 0,
+          recorded_at: dateOnly,
+        }));
+
+        // Upsert per day per player per queue
+        return supaFetch('/rank_stats?on_conflict=player_id,queue_type,recorded_at', {
+          method: 'POST',
+          headers: {
+            Prefer: 'resolution=merge-duplicates,return=representation',
+          },
+          body: JSON.stringify(payload),
+        });
+      }
+
       return new Response('Not Found', { status: 404, headers: corsHeaders });
     } catch (e) {
       return new Response(JSON.stringify({ error: 'Proxy error', message: e?.message || String(e) }), {

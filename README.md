@@ -52,7 +52,6 @@ npx wrangler deploy
 
 - db fertig stellen
 - Loginfunktion
-- zeit von action auf deutsche zeit anpassen 
 
 # --- ideas: ------------------------------------------
 

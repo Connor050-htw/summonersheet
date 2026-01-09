@@ -26,6 +26,11 @@
             style="text-align: center;"
             @keyup.enter="fetchAndGeneratePDF"
           />
+          <select v-model="region" class="input select-region">
+            <option v-for="r in regions" :key="r.value" :value="r.value">
+              {{ r.label }}
+            </option>
+          </select>
           <button 
             v-if="snapshots.length === 0"
             @click="loadSnapshots" 
@@ -80,13 +85,14 @@ import { getChampionMasteryByPUUID } from '../api/GetChampionMastery';
 import { getPlayerDetailsByPUUID } from '../api/GetPlayerDetails';
 import { getRiotIdByPUUID } from '../api/GetRiotIdByPUUID';
 import { getSummonerByPUUID } from '../api/GetSummonerByPUUID';
-import { getPlayerSnapshots, getSummonerStatsByDate } from '../db/players';
+import { getPlayerSnapshots, getSummonerStatsByDate, getPlayerByPUUID, saveChampionStats, saveRankStats } from '../db/players';
 import { generatePlayerPDF } from '../utils/pdfGenerator';
 // import { getTftLeagueByPUUID } from '../api/GetTftLeagueByPUUID';
 
 // Platzhalter für Summoner Name und Tag Line
 const gameName = ref('');
 const tagLine = ref('');
+const region = ref('EUW');
 const playerData = ref(null);
 const championMastery = ref(null);
 const leagueDetails = ref(null);
@@ -99,6 +105,19 @@ const isLoadingSnapshots = ref(false); // Loading nur für Snapshots
 const hasGenerated = ref(false);
 const snapshots = ref([]);
 const selectedSnapshot = ref('today');
+const regions = [
+  { value: 'EUW', label: 'EUW' },
+  { value: 'EUNE', label: 'EUNE' },
+  { value: 'NA', label: 'NA' },
+  { value: 'KR', label: 'KR' },
+  { value: 'LAN', label: 'LAN' },
+  { value: 'LAS', label: 'LAS' },
+  { value: 'BR', label: 'BR' },
+  { value: 'TR', label: 'TR' },
+  { value: 'RU', label: 'RU' },
+  { value: 'JP', label: 'JP' },
+  { value: 'OCE', label: 'OCE' },
+];
 
 // Format Datum für Anzeige
 function formatDate(dateString) {
@@ -193,6 +212,29 @@ const fetchAndGeneratePDF = async () => {
         profileIconId: historicalStats?.profile_icon_id
       };
       summonerInfo.value = summonerData;
+    }
+
+    // Player record holen, um Stats zu speichern
+    let playerRecord = null;
+    try {
+      playerRecord = await getPlayerByPUUID(data.puuid);
+    } catch (dbErr) {
+      console.warn('Could not fetch player record for stats:', dbErr?.message || dbErr);
+    }
+
+    // Nur bei aktuellen Daten: Champion- und Rank-Stats in DB schreiben
+    if (playerRecord?.player_id && selectedSnapshot.value === 'today') {
+      try {
+        await saveChampionStats(playerRecord.player_id, masteryData);
+      } catch (err) {
+        console.warn('Saving champion stats failed:', err?.message || err);
+      }
+
+      try {
+        await saveRankStats(playerRecord.player_id, allLeagueDetails);
+      } catch (err) {
+        console.warn('Saving rank stats failed:', err?.message || err);
+      }
     }
 
     pdfPreviewUrl.value = await generatePlayerPDF(
