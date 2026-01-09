@@ -2,8 +2,8 @@ name: Update Assets & Deploy
 
 on:
   schedule:
-    - cron: '30 13 * * 5'  # Jeden Freitag um 13:30 UTC
-  workflow_dispatch:       # Auch manuell triggerbar
+    - cron: '0 0 * * 5'  # Jeden Freitag um 00:00 UTC (01:00 MEZ Winter / 02:00 MESZ Sommer)
+  workflow_dispatch:      # Auch manuell triggerbar
 
 jobs:
   update-and-deploy:
