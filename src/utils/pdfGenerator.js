@@ -1,10 +1,32 @@
 import { jsPDF } from 'jspdf';
-import championDataRaw from '../assets/data/championFull.json';
+
+// Laufzeitlader für aktuelle Champion-Daten aus /public
+async function loadChampionData() {
+  const url = `${import.meta.env.BASE_URL}assets/data/championFull.json`;
+  try {
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (e) {
+    // Online-Fallback: Data Dragon Championliste laden
+    try {
+      const versionsRes = await fetch('https://ddragon.leagueoflegends.com/api/versions.json', { cache: 'no-store' });
+      const versions = await versionsRes.json();
+      const latest = Array.isArray(versions) && versions.length ? versions[0] : 'latest';
+      const ddUrl = `https://ddragon.leagueoflegends.com/cdn/${latest}/data/en_US/champion.json`;
+      const ddRes = await fetch(ddUrl, { cache: 'no-store' });
+      if (!ddRes.ok) throw new Error(`HTTP ${ddRes.status}`);
+      return await ddRes.json();
+    } catch {
+      return { data: {} };
+    }
+  }
+}
 
 // Hilfsfunktion: ChampionId (int) zu Name
-function getChampionNameById(id) {
+function getChampionNameById(id, championData) {
   const champKey = String(id);
-  const champions = championDataRaw.data;
+  const champions = championData?.data || {};
   for (const champName in champions) {
     if (champions[champName].key === champKey) {
       return champName; // Internal ID (z.B. "MasterYi", "MonkeyKing")
@@ -42,6 +64,8 @@ async function getRankIconDataUrl(tier) {
 
 // Async PDF-Generator!
 export const generatePlayerPDF = async (playerData, championMastery, leagueDetails, riotId, summonerInfo, normalStats) => {
+  // Lade zur Laufzeit die neueste Championliste aus /public
+  const championData = await loadChampionData();
   const doc = new jsPDF();
 
   // Timestamp und Footer vorbereiten (nur EINMAL deklarieren)
@@ -226,7 +250,7 @@ export const generatePlayerPDF = async (playerData, championMastery, leagueDetai
 
     for (let i = 0; i < totalImgs; i++) {
       const champion = championMastery[i];
-      const champId = getChampionNameById(champion.championId); // Internal ID
+      const champId = getChampionNameById(champion.championId, championData); // Internal ID
       
       const x = startX + i * (imgWidth + spaceBetween);
       const yImg = imgY + 5;
@@ -234,7 +258,7 @@ export const generatePlayerPDF = async (playerData, championMastery, leagueDetai
       // Champion-Name zentriert über dem Bild (Display-Name)
       let displayName = 'Unknown';
       if (champId) {
-        displayName = championDataRaw.data[champId]?.name || champId;
+        displayName = championData?.data?.[champId]?.name || champId;
       } else {
         // Wenn Champion nicht in JSON, fallback zu championId
         displayName = `Champion #${champion.championId}`;
