@@ -1,10 +1,11 @@
 import api from './http';
+import { DEFAULT_PLATFORM, DEFAULT_REGIONAL } from './regions';
 
 // Example: Summoner by Name
-export const getSummonerByName = async (gameName, tagLine) => {
+export const getSummonerByName = async (gameName, tagLine, region = DEFAULT_PLATFORM) => {
   try {
     const response = await api.get('/api/account/by-riot-id', {
-      params: { name: gameName, tag: tagLine }
+      params: { name: gameName, tag: tagLine, region }
     });
     //console.log(response.data);
     return response.data;

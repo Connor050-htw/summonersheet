@@ -1,10 +1,11 @@
 import api from './http';
 import { getPlayerByPUUID, syncPlayer, saveSummonerStats } from '../db/players.js';
+import { DEFAULT_PLATFORM } from './regions';
 
-export const getSummonerByPUUID = async (puuid) => {
+export const getSummonerByPUUID = async (puuid, region = DEFAULT_PLATFORM) => {
   try {
     const response = await api.get('/api/lol/summoner/by-puuid', {
-      params: { puuid }
+      params: { puuid, region }
     });
     const summonerData = response.data;
 
@@ -13,7 +14,7 @@ export const getSummonerByPUUID = async (puuid) => {
       let player = await getPlayerByPUUID(puuid);
       
       if (!player) {
-        player = await syncPlayer(puuid, summonerData.name, 'unknown');
+        player = await syncPlayer(puuid, summonerData.name, 'unknown', region);
       }
 
       await saveSummonerStats(player.player_id, {

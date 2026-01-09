@@ -1,10 +1,11 @@
 import api from './http';
+import { DEFAULT_PLATFORM } from './regions';
 
 // Fetch detailed player information using PUUID
-export const getPlayerDetailsByPUUID = async (puuid) => {
+export const getPlayerDetailsByPUUID = async (puuid, region = DEFAULT_PLATFORM) => {
   try {
     const response = await api.get('/api/lol/league/by-puuid', {
-      params: { puuid }
+      params: { puuid, region }
     });
     //console.log(response.data);
     return response.data;

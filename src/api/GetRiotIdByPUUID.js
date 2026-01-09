@@ -1,16 +1,17 @@
 import api from './http';
 import { syncPlayer } from '../db/players.js';
+import { DEFAULT_PLATFORM } from './regions';
 
-export const getRiotIdByPUUID = async (puuid) => {
+export const getRiotIdByPUUID = async (puuid, region = DEFAULT_PLATFORM) => {
   try {
     const response = await api.get('/api/account/by-puuid', {
-      params: { puuid }
+      params: { puuid, region }
     });
     const accountData = response.data; // { gameName, tagLine, puuid }
 
     // In DB speichern
     try {
-      await syncPlayer(accountData.puuid, accountData.gameName, accountData.tagLine);
+      await syncPlayer(accountData.puuid, accountData.gameName, accountData.tagLine, region);
       console.log('✓ Player saved to database:', accountData.gameName);
     } catch (dbError) {
       console.warn('Database sync failed:', dbError.message);

@@ -7,7 +7,9 @@
         <p>
           <strong>What is this Website?</strong><br/>
           Generate a beautiful PDF with the most important stats and information about your League of Legends account.<br />
-          You can share, download, or print the PDF to impress your friend!<br />
+          You can share, download, or print the PDF to impress your friend!<br /><br />
+          Your statistics are saved for the day as soon as you search for your account.<br />
+          This allows you to view old statistics as well.  
         </p>
       </div>
       <div class="form">
@@ -35,7 +37,7 @@
             v-if="snapshots.length === 0"
             @click="loadSnapshots" 
             class="button button-secondary" 
-            :disabled="isLoadingSnapshots"
+            :disabled="isLoadingSnapshots || !gameName || !tagLine"
           >
             <span v-if="isLoadingSnapshots" class="button-spinner"></span>
             <span v-else>Select Date</span>
@@ -92,7 +94,7 @@ import { generatePlayerPDF } from '../utils/pdfGenerator';
 // Platzhalter für Summoner Name und Tag Line
 const gameName = ref('');
 const tagLine = ref('');
-const region = ref('EUW');
+const region = ref('euw1');
 const playerData = ref(null);
 const championMastery = ref(null);
 const leagueDetails = ref(null);
@@ -106,17 +108,26 @@ const hasGenerated = ref(false);
 const snapshots = ref([]);
 const selectedSnapshot = ref('today');
 const regions = [
-  { value: 'EUW', label: 'EUW' },
-  { value: 'EUNE', label: 'EUNE' },
-  { value: 'NA', label: 'NA' },
-  { value: 'KR', label: 'KR' },
-  { value: 'LAN', label: 'LAN' },
-  { value: 'LAS', label: 'LAS' },
-  { value: 'BR', label: 'BR' },
-  { value: 'TR', label: 'TR' },
-  { value: 'RU', label: 'RU' },
-  { value: 'JP', label: 'JP' },
-  { value: 'OCE', label: 'OCE' },
+  // Europa
+  { value: 'euw1', label: 'EUW' },
+  { value: 'eun1', label: 'EUNE' },
+  { value: 'tr1', label: 'TR' },
+  { value: 'ru', label: 'RU' },
+  // Americas
+  { value: 'na1', label: 'NA' },
+  { value: 'br1', label: 'BR' },
+  { value: 'la1', label: 'LAN' },
+  { value: 'la2', label: 'LAS' },
+  // Asia
+  { value: 'kr', label: 'KR' },
+  { value: 'jp1', label: 'JP' },
+  // Southeast Asia
+  { value: 'oc1', label: 'OCE' },
+  { value: 'ph2', label: 'PH' },
+  { value: 'sg2', label: 'SG' },
+  { value: 'th2', label: 'TH' },
+  { value: 'tw2', label: 'TW' },
+  { value: 'vn2', label: 'VN' },
 ];
 
 // Format Datum für Anzeige
@@ -139,7 +150,7 @@ const loadSnapshots = async () => {
 
   try {
     isLoadingSnapshots.value = true;
-    const data = await getSummonerByName(gameName.value, tagLine.value);
+    const data = await getSummonerByName(gameName.value, tagLine.value, region.value);
     const loadedSnapshots = await getPlayerSnapshots(data.puuid);
     snapshots.value = loadedSnapshots;
     
@@ -179,13 +190,13 @@ const fetchAndGeneratePDF = async () => {
   let skipDelay = false;
   const start = Date.now();
   try {
-    const data = await getSummonerByName(gameName.value, tagLine.value);
+    const data = await getSummonerByName(gameName.value, tagLine.value, region.value);
     playerData.value = data;
 
-    const masteryData = await getChampionMasteryByPUUID(data.puuid);
+    const masteryData = await getChampionMasteryByPUUID(data.puuid, region.value);
     championMastery.value = masteryData;
 
-    const leagueData = await getPlayerDetailsByPUUID(data.puuid);
+    const leagueData = await getPlayerDetailsByPUUID(data.puuid, region.value);
     // const tftLeagueData = await getTftLeagueByPUUID(data.puuid);
 
     // Kombiniere alle League-Daten (Solo, Flex) - TFT auskommentiert
@@ -196,13 +207,13 @@ const fetchAndGeneratePDF = async () => {
 
     leagueDetails.value = allLeagueDetails;
 
-    const riotIdData = await getRiotIdByPUUID(data.puuid);
+    const riotIdData = await getRiotIdByPUUID(data.puuid, region.value);
     riotId.value = riotIdData;
 
     let summonerData;
     if (selectedSnapshot.value === 'today') {
       // Aktuelle Daten
-      summonerData = await getSummonerByPUUID(data.puuid);
+      summonerData = await getSummonerByPUUID(data.puuid, region.value);
       summonerInfo.value = summonerData;
     } else {
       // Historische Daten
@@ -243,7 +254,9 @@ const fetchAndGeneratePDF = async () => {
       leagueDetails.value,
       riotId.value,
       summonerInfo.value,
-      null
+      null,
+      region.value,
+      selectedSnapshot.value
     );
     hasGenerated.value = true;
     errorMessage.value = '';
@@ -528,9 +541,9 @@ onUnmounted(() => {
 }
 
 .button-secondary {
-  background: linear-gradient(270deg, #8b7355 0%, #a89c7c 100%);
+  background: linear-gradient(270deg, #e2c08d 0%, #f4e4c1 100%);
   color: #2a210a;
-  box-shadow: 0 2px 8px 0 #8b735522;
+  box-shadow: 0 2px 8px 0 #e2c08d22;
 }
 
 .button:disabled {

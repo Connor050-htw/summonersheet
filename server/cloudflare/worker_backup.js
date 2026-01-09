@@ -1,3 +1,5 @@
+// this worker works without regions; all requests are forwarded to europe or euw1 as needed
+
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
@@ -15,17 +17,6 @@ export default {
     if (req.method === 'OPTIONS') {
       return new Response(null, { headers: corsHeaders });
     }
-
-    // Mapping von Platform Route zu Regional Route
-    const platformToRegional = {
-      'euw1': 'europe', 'eun1': 'europe', 'tr1': 'europe', 'ru': 'europe',
-      'na1': 'americas', 'br1': 'americas', 'la1': 'americas', 'la2': 'americas',
-      'kr': 'asia', 'jp1': 'asia',
-      'oc1': 'sea', 'ph2': 'sea', 'sg2': 'sea', 'th2': 'sea', 'tw2': 'sea', 'vn2': 'sea',
-    };
-
-    // Hilfsfunktion: Regional Route von Platform Route ableiten
-    const getRegionalRoute = (platform) => platformToRegional[platform] || 'europe';
 
     // Helper to forward a Riot request with X-Riot-Token
     const forward = (riotUrl) => fetch(riotUrl, {
@@ -54,77 +45,62 @@ export default {
     };
 
     try {
-      // Account API (regional cluster)
+      // Account API (europe cluster)
       if (url.pathname === '/api/account/by-riot-id') {
         const name = url.searchParams.get('name');
         const tag  = url.searchParams.get('tag');
-        let region = url.searchParams.get('region') ?? 'euw1';
-        // Konvertiere Platform Route zu Regional Route wenn nötig
-        region = getRegionalRoute(region);
         if (!name || !tag) return new Response('Bad Request', { status: 400, headers: corsHeaders });
-        const upstream = `https://${encodeURIComponent(region)}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`;
+        const upstream = `https://europe.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`;
         const resp = await forward(upstream);
         return new Response(await resp.text(), { status: resp.status, headers: { ...corsHeaders, 'Content-Type': resp.headers.get('Content-Type') ?? 'application/json' } });
       }
 
       if (url.pathname === '/api/account/by-puuid') {
         const puuid = url.searchParams.get('puuid');
-        let region = url.searchParams.get('region') ?? 'euw1';
-        // Konvertiere Platform Route zu Regional Route wenn nötig
-        region = getRegionalRoute(region);
         if (!puuid) return new Response('Bad Request', { status: 400, headers: corsHeaders });
-        const upstream = `https://${encodeURIComponent(region)}.api.riotgames.com/riot/account/v1/accounts/by-puuid/${encodeURIComponent(puuid)}`;
+        const upstream = `https://europe.api.riotgames.com/riot/account/v1/accounts/by-puuid/${encodeURIComponent(puuid)}`;
         const resp = await forward(upstream);
         return new Response(await resp.text(), { status: resp.status, headers: { ...corsHeaders, 'Content-Type': resp.headers.get('Content-Type') ?? 'application/json' } });
       }
 
-      // LoL platform routes (dynamic region)
+      // LoL platform routes (euw1)
       if (url.pathname === '/api/lol/summoner/by-puuid') {
         const puuid = url.searchParams.get('puuid');
-        const region = url.searchParams.get('region') ?? 'euw1';
-        const upstream = `https://${encodeURIComponent(region)}.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/${encodeURIComponent(puuid)}`;
+        const upstream = `https://euw1.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/${encodeURIComponent(puuid)}`;
         const resp = await forward(upstream);
         return new Response(await resp.text(), { status: resp.status, headers: { ...corsHeaders, 'Content-Type': resp.headers.get('Content-Type') ?? 'application/json' } });
       }
 
       if (url.pathname === '/api/lol/league/by-puuid') {
         const puuid = url.searchParams.get('puuid');
-        const region = url.searchParams.get('region') ?? 'euw1';
-        const upstream = `https://${encodeURIComponent(region)}.api.riotgames.com/lol/league/v4/entries/by-puuid/${encodeURIComponent(puuid)}`;
+        const upstream = `https://euw1.api.riotgames.com/lol/league/v4/entries/by-puuid/${encodeURIComponent(puuid)}`;
         const resp = await forward(upstream);
         return new Response(await resp.text(), { status: resp.status, headers: { ...corsHeaders, 'Content-Type': resp.headers.get('Content-Type') ?? 'application/json' } });
       }
 
       if (url.pathname === '/api/lol/champion-mastery/by-puuid') {
         const puuid = url.searchParams.get('puuid');
-        const region = url.searchParams.get('region') ?? 'euw1';
-        const upstream = `https://${encodeURIComponent(region)}.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/${encodeURIComponent(puuid)}`;
+        const upstream = `https://euw1.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/${encodeURIComponent(puuid)}`;
         const resp = await forward(upstream);
         return new Response(await resp.text(), { status: resp.status, headers: { ...corsHeaders, 'Content-Type': resp.headers.get('Content-Type') ?? 'application/json' } });
       }
 
-      // Match-V5 (regional cluster)
+      // Match-V5 (europe cluster)
       if (url.pathname === '/api/lol/match/ids') {
         const puuid = url.searchParams.get('puuid');
         const start = url.searchParams.get('start') ?? '0';
         const count = url.searchParams.get('count') ?? '5';
         const queue = url.searchParams.get('queue');
-        let region = url.searchParams.get('region') ?? 'euw1';
-        // Konvertiere Platform Route zu Regional Route wenn nötig
-        region = getRegionalRoute(region);
         const qs = new URLSearchParams({ start, count });
         if (queue) qs.set('queue', queue);
-        const upstream = `https://${encodeURIComponent(region)}.api.riotgames.com/lol/match/v5/matches/by-puuid/${encodeURIComponent(puuid)}/ids?${qs.toString()}`;
+        const upstream = `https://europe.api.riotgames.com/lol/match/v5/matches/by-puuid/${encodeURIComponent(puuid)}/ids?${qs.toString()}`;
         const resp = await forward(upstream);
         return new Response(await resp.text(), { status: resp.status, headers: { ...corsHeaders, 'Content-Type': resp.headers.get('Content-Type') ?? 'application/json' } });
       }
 
       if (url.pathname.startsWith('/api/lol/match/by-id/')) {
         const matchId = url.pathname.split('/').pop();
-        let region = url.searchParams.get('region') ?? 'euw1';
-        // Konvertiere Platform Route zu Regional Route wenn nötig
-        region = getRegionalRoute(region);
-        const upstream = `https://${encodeURIComponent(region)}.api.riotgames.com/lol/match/v5/matches/${encodeURIComponent(matchId)}`;
+        const upstream = `https://europe.api.riotgames.com/lol/match/v5/matches/${encodeURIComponent(matchId)}`;
         const resp = await forward(upstream);
         return new Response(await resp.text(), { status: resp.status, headers: { ...corsHeaders, 'Content-Type': resp.headers.get('Content-Type') ?? 'application/json' } });
       }
@@ -136,8 +112,7 @@ export default {
         if (!body || !body.puuid || !body.gameName || !body.tagLine) {
           return new Response(JSON.stringify({ error: 'Missing fields: puuid, gameName, tagLine' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
-        const region = body.region || 'euw1';
-        const payload = [{ puuid: body.puuid, gameName: body.gameName, tagline: body.tagLine, region }];
+        const payload = [{ puuid: body.puuid, gameName: body.gameName, tagline: body.tagLine }];
         // onConflict via Prefer header; returning=representation to get row back
         // Upsert using puuid as conflict target
         return supaFetch('/players?on_conflict=puuid', {

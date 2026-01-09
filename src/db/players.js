@@ -2,13 +2,13 @@ import { supabase } from './supabase.js'
 import { PROXY_BASE } from '../api/config.js'
 
 // Player zu DB hinzufügen oder aktualisieren
-export const syncPlayer = async (puuid, gameName, tagLine) => {
+export const syncPlayer = async (puuid, gameName, tagLine, region = 'euw1') => {
   try {
     // Route write via Worker to keep service key server-side
     const resp = await fetch(`${PROXY_BASE}/api/db/player/sync`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ puuid, gameName, tagLine })
+      body: JSON.stringify({ puuid, gameName, tagLine, region })
     })
     if (!resp.ok) throw new Error(`Worker error ${resp.status}`)
     const data = await resp.json()

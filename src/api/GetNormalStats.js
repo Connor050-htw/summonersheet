@@ -1,7 +1,8 @@
 import api from './http';
+import { DEFAULT_PLATFORM } from './regions';
 
 // Gibt die Stats der letzten 100 Normal Games zurück
-export const getNormalStatsByPUUID = async (puuid) => {
+export const getNormalStatsByPUUID = async (puuid, region = DEFAULT_PLATFORM) => {
   // Nur Draft Pick (430)
   const normalQueueId = 430;
   let wins = 0;
@@ -9,7 +10,7 @@ export const getNormalStatsByPUUID = async (puuid) => {
 
   // 1. Match-IDs holen (nur Draft Pick, nur 5)
   const matchIdsResp = await api.get('/api/lol/match/ids', {
-    params: { puuid, start: 0, count: 5, queue: normalQueueId },
+    params: { puuid, start: 0, count: 5, queue: normalQueueId, region },
   });
   const matchIds = matchIdsResp.data;
 
