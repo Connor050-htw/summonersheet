@@ -7,8 +7,8 @@ export default {
     const origin = req.headers.get('Origin');
     const corsHeaders = {
       'Access-Control-Allow-Origin': origin && origin !== 'null' ? origin : allowedOrigin,
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       'Vary': 'Origin',
     };
 
@@ -20,6 +20,27 @@ export default {
     const forward = (riotUrl) => fetch(riotUrl, {
       headers: { 'X-Riot-Token': env.RIOT_API_KEY },
     });
+
+    // Helper to call Supabase REST API using service role (server-side only)
+    const supaFetch = async (path, init = {}) => {
+      const supabaseUrl = env.SUPABASE_URL;
+      const serviceKey = env.SUPABASE_SERVICE_ROLE;
+      if (!supabaseUrl || !serviceKey) {
+        return new Response(JSON.stringify({ error: 'Supabase not configured in Worker env' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const headers = {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        'Content-Type': 'application/json',
+      };
+      const resp = await fetch(`${supabaseUrl}/rest/v1${path}`, { ...init, headers: { ...headers, ...(init.headers || {}) } });
+      const text = await resp.text();
+      const type = resp.headers.get('Content-Type') ?? 'application/json';
+      return new Response(text, { status: resp.status, headers: { ...corsHeaders, 'Content-Type': type } });
+    };
 
     try {
       // Account API (europe cluster)
@@ -80,6 +101,69 @@ export default {
         const upstream = `https://europe.api.riotgames.com/lol/match/v5/matches/${encodeURIComponent(matchId)}`;
         const resp = await forward(upstream);
         return new Response(await resp.text(), { status: resp.status, headers: { ...corsHeaders, 'Content-Type': resp.headers.get('Content-Type') ?? 'application/json' } });
+      }
+
+      // ----- Supabase DB endpoints (server-side writes) -----
+      // Upsert player
+      if (url.pathname === '/api/db/player/sync' && req.method === 'POST') {
+        const body = await req.json().catch(() => null);
+        if (!body || !body.puuid || !body.gameName || !body.tagLine) {
+          return new Response(JSON.stringify({ error: 'Missing fields: puuid, gameName, tagLine' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        const payload = [{ puuid: body.puuid, gameName: body.gameName, tagline: body.tagLine }];
+        // onConflict via Prefer header; returning=representation to get row back
+        // Upsert using puuid as conflict target
+        return supaFetch('/players?on_conflict=puuid', {
+          method: 'POST',
+          headers: {
+            Prefer: 'resolution=merge-duplicates,return=representation',
+          },
+          body: JSON.stringify(payload),
+        });
+      }
+
+      // Insert summoner stats snapshot
+      if (url.pathname === '/api/db/stats/save' && req.method === 'POST') {
+        const body = await req.json().catch(() => null);
+        if (!body || !body.playerId || !body.summonerData) {
+          return new Response(JSON.stringify({ error: 'Missing fields: playerId, summonerData' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        const s = body.summonerData || {};
+        const dateOnly = new Date().toISOString().slice(0, 10); // YYYY-MM-DD for 'date' column
+        const payload = [{
+          player_id: Number(body.playerId),
+          summoner_level: s.summonerLevel != null ? Number(s.summonerLevel) : null,
+          profile_icon_id: s.profileIconId != null ? Number(s.profileIconId) : null,
+          recorded_at: dateOnly,
+        }];
+        // Upsert per day per player; requires unique constraint on (player_id, recorded_at)
+        const supaResp = await supaFetch('/summoner_stats?on_conflict=player_id,recorded_at', {
+          method: 'POST',
+          headers: {
+            Prefer: 'resolution=merge-duplicates,return=representation',
+          },
+          body: JSON.stringify(payload),
+        });
+
+        // Gracefully handle duplicate (already have a snapshot today)
+        if (supaResp.status === 409) {
+          const bodyText = await supaResp.text();
+          try {
+            const json = JSON.parse(bodyText);
+            if (json?.code === '23505') {
+              return new Response(JSON.stringify({ status: 'duplicate', message: 'Snapshot for today already exists' }), {
+                status: 200,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              });
+            }
+            // fallthrough to propagate other 409s
+            return new Response(bodyText, { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          } catch (e) {
+            return new Response(bodyText || JSON.stringify({ error: 'Conflict' }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          }
+        }
+
+        return supaResp;
       }
 
       return new Response('Not Found', { status: 404, headers: corsHeaders });

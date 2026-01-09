@@ -1,19 +1,18 @@
 import { supabase } from './supabase.js'
+import { PROXY_BASE } from '../api/config.js'
 
 // Player zu DB hinzufügen oder aktualisieren
 export const syncPlayer = async (puuid, gameName, tagLine) => {
   try {
-    const { data, error } = await supabase
-      .from('players')
-      .upsert({
-        puuid,
-        gameName,
-        tagline: tagLine,
-      }, { onConflict: 'puuid' })
-      .select()
-
-    if (error) throw error
-    return data[0]
+    // Route write via Worker to keep service key server-side
+    const resp = await fetch(`${PROXY_BASE}/api/db/player/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ puuid, gameName, tagLine })
+    })
+    if (!resp.ok) throw new Error(`Worker error ${resp.status}`)
+    const data = await resp.json()
+    return Array.isArray(data) ? data[0] : data
   } catch (error) {
     console.error('Error syncing player:', error.message)
     throw error
@@ -23,17 +22,17 @@ export const syncPlayer = async (puuid, gameName, tagLine) => {
 // Summoner Stats speichern
 export const saveSummonerStats = async (playerId, summonerData) => {
   try {
-    const { data, error } = await supabase
-      .from('summoner_stats')
-      .insert({
-        player_id: playerId,
-        summoner_level: summonerData.summonerLevel,
-        account_id: summonerData.accountId,
-        profile_icon_id: summonerData.profileIconId,
-        recorded_at: new Date()
-      })
-
-    if (error) throw error
+    // Route write via Worker to keep service key server-side
+    const resp = await fetch(`${PROXY_BASE}/api/db/stats/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId, summonerData })
+    })
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => '')
+      throw new Error(`Worker error ${resp.status}${text ? `: ${text}` : ''}`)
+    }
+    const data = await resp.json()
     return data
   } catch (error) {
     console.error('Error saving summoner stats:', error.message)
