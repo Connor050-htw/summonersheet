@@ -1,0 +1,74 @@
+name: Update Assets & Deploy
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Jeden Sonntag um 00:00 UTC
+  workflow_dispatch:      # Auch manuell triggerbar
+
+jobs:
+  update-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Get latest Data Dragon version
+        id: version
+        run: |
+          VERSION=$(curl -s https://ddragon.leagueoflegends.com/api/versions.json | jq -r '.[0]')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Latest version: $VERSION"
+      
+      - name: Clean old assets
+        run: |
+          rm -rf public/assets/data/championloading/*
+          rm -rf public/assets/data/profileicon/*
+          echo "Old assets removed"
+      
+      - name: Download Data Dragon assets
+        run: |
+          mkdir -p public/assets/data/championloading
+          mkdir -p public/assets/data/profileicon
+          
+          BASE_URL="https://ddragon.leagueoflegends.com/cdn/${{ steps.version.outputs.version }}"
+          
+          echo "Downloading champion splash arts..."
+          curl -s "${BASE_URL}/img/champion/" | grep -oP '(?<=href=")[^"]*\.png' | while read file; do
+            curl -s -o "public/assets/data/championloading/$file" "${BASE_URL}/img/champion/$file"
+          done
+          
+          echo "Downloading profile icons..."
+          curl -s "${BASE_URL}/img/profileicon/" | grep -oP '(?<=href=")[^"]*\.png' | while read file; do
+            curl -s -o "public/assets/data/profileicon/$file" "${BASE_URL}/img/profileicon/$file"
+          done
+          
+          echo "Downloading champion metadata..."
+          curl -s "${BASE_URL}/data/en_US/champion.json" -o public/assets/data/championFull.json
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build project
+        run: npm run build
+      
+      - name: Deploy to GitHub Pages
+        run: npm run deploy
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Commit and push asset updates
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add public/assets/data/
+          git diff --quiet && git diff --staged --quiet || (
+            git commit -m "Update Data Dragon assets to ${{ steps.version.outputs.version }}"
+            git push
+          )
