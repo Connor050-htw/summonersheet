@@ -51,7 +51,8 @@ npx wrangler deploy
 # --- todo: ------------------------------------------
 
 - db fertig stellen
-- Loginfunktion
+- Loginfunktion: dadurch automatische snapshot erstellung; Mehrere Accounts verwalten; Dashboard-Einrichtung
+- Datenschutzerklärung; Impressum; Cookie-Banner; etc. 
 
 # --- ideas: ------------------------------------------
 
