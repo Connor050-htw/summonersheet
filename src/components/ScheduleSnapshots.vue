@@ -1,7 +1,10 @@
 <template>
   <div class="schedule-section">
     <h3 class="section-title">Auto Snapshots</h3>
-    <p class="section-desc">Schedule 3 days of automatic stat snapshots</p>
+    <p class="section-desc">Schedule 3 days of automatic stat snapshots.<br>
+        Every day at 04:00 CET, the latest data is imported from Riot Games. <br>
+        This means you don't need to submit a request every day to save the latest data.<br><br>
+        You can have a maximum of 3 schedulers active.</p>
 
     <form @submit.prevent="handleSchedule" class="schedule-form">
       <div class="form-group">

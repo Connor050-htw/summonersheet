@@ -175,12 +175,12 @@ const handleSubmit = async () => {
 
   try {
     if (isLogin.value) {
-      // Close sidebar after successful login
-      setTimeout(() => {
-        emit('close')
-      }, 1000)
       await signIn(email.value.trim(), password.value)
       successMessage.value = 'Successfully signed in!'
+      // Close sidebar only after successful login
+      setTimeout(() => {
+        emit('close')
+      }, 500)
     } else {
       if (!email.value) {
         throw new Error('Email is required to create an account')
@@ -213,11 +213,9 @@ const handleResetPassword = async () => {
 
 <style scoped>
 .auth-sidebar-container {
-  padding: 3rem 1.5rem 2rem;
-  min-height: 100vh;
+  padding: 2rem 1.5rem 2rem;
   display: flex;
   flex-direction: column;
-  justify-content: center;
 }
 
 .auth-card {

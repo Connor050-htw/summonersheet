@@ -29,7 +29,6 @@ const toggleAuthSidebar = () => {
 const handleSignOut = async () => {
   try {
     await signOut()
-    showAuthSidebar.value = false
   } catch (error) {
     console.error('Error signing out:', error)
   }
@@ -63,6 +62,32 @@ const isResetRoute = computed(() => route.name === 'reset')
       <div v-if="showAuthSidebar" class="sidebar-overlay" @click="closeAuthSidebar">
         <div class="sidebar-content" @click.stop>
           <button @click="closeAuthSidebar" class="close-button" aria-label="Close"></button>
+            
+            <!-- Benefits Section (only show when not logged in) -->
+            <div v-if="!user" class="benefits-section">
+            <h2>Why Register?</h2>
+            <div class="benefit-card">
+              <div class="benefit-icon">📊</div>
+              <div class="benefit-text">
+                <h3>Automatic Snapshots</h3>
+                <p>Schedule automatic stat collection for up to 3 days</p>
+              </div>
+            </div>
+            <div class="benefit-card">
+              <div class="benefit-icon">📈</div>
+              <div class="benefit-text">
+                <h3>Track Progress          </h3>
+                <p>Monitor your improvement over time with historical data</p>
+              </div>
+            </div>
+            <div class="benefit-card">
+              <div class="benefit-icon">🎮</div>
+              <div class="benefit-text">
+                <h3>Multi-Account Support</h3>
+                <p>Manage multiple summoner accounts in one place</p>
+              </div>
+            </div>
+          </div>
           
           <div v-if="user" class="user-panel">
             <h2>Account</h2>
@@ -242,6 +267,71 @@ const isResetRoute = computed(() => route.name === 'reset')
   -webkit-text-fill-color: transparent;
   background-clip: text;
   margin: 0;
+}
+
+/* Benefits Section */
+.benefits-section {
+  padding: 2rem 2rem 1rem 2rem;
+  border-bottom: 1px solid rgba(226, 192, 141, 0.2);
+}
+
+.benefits-section h2 {
+  font-size: 1.75rem;
+  font-weight: bold;
+  background: linear-gradient(90deg, #e2c08d 0%, #f4e4c1 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0 0 1.5rem 0;
+}
+
+.benefit-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(226, 192, 141, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(226, 192, 141, 0.2);
+  margin-bottom: 0.75rem;
+  transition: all 0.2s ease;
+}
+
+.benefit-card:hover {
+  background: rgba(226, 192, 141, 0.1);
+  border-color: rgba(226, 192, 141, 0.4);
+  transform: translateX(4px);
+}
+
+.benefit-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+  width: 2.5rem;
+  min-width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.benefit-text {
+  flex: 1;
+}
+
+.benefit-text h3 {
+  color: #f4e4c1;
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 0.25rem 0;
+  text-align: left;
+}
+
+.benefit-text p {
+  color: rgba(244, 228, 193, 0.7);
+  font-size: 0.875rem;
+  margin: 0;
+  line-height: 1.4;
+  text-align: left;
 }
 
 .user-info {
