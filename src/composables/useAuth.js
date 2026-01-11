@@ -89,6 +89,24 @@ export function useAuth() {
     return data
   }
 
+  // Delete user account
+  const deleteAccount = async () => {
+    if (!user.value) throw new Error('No user logged in')
+
+    try {
+      // Delete user from auth
+      const { error } = await supabase.auth.admin.deleteUser(user.value.id)
+      if (error) throw error
+
+      // Clear local state
+      user.value = null
+      session.value = null
+    } catch (error) {
+      console.error('Error deleting account:', error)
+      throw error
+    }
+  }
+
   const isAuthenticated = computed(() => !!user.value)
 
   return {
@@ -103,5 +121,6 @@ export function useAuth() {
     signOut,
     resetPassword,
     updatePassword,
+    deleteAccount,
   }
 }

@@ -7,7 +7,7 @@ import ResetPassword from './components/ResetPassword.vue'
 import ScheduleSnapshots from './components/ScheduleSnapshots.vue'
 import { useAuth } from './composables/useAuth'
 
-const { user, loading, initAuth, setupAuthListener, signOut } = useAuth()
+const { user, loading, initAuth, setupAuthListener, signOut, deleteAccount } = useAuth()
 const route = useRoute()
 
 const showAuthSidebar = ref(false)
@@ -31,6 +31,20 @@ const handleSignOut = async () => {
     await signOut()
   } catch (error) {
     console.error('Error signing out:', error)
+  }
+}
+
+const handleDeleteAccount = async () => {
+  if (!confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+    return
+  }
+  
+  try {
+    await deleteAccount()
+    showAuthSidebar.value = false
+  } catch (error) {
+    console.error('Error deleting account:', error)
+    alert('Failed to delete account: ' + error.message)
   }
 }
 
@@ -96,6 +110,7 @@ const isResetRoute = computed(() => route.name === 'reset')
               <p class="user-email">{{ user.email }}</p>
             </div>
             <button @click="handleSignOut" class="signout-button">Sign Out</button>
+            <button @click="handleDeleteAccount" class="delete-button">Delete Account</button>
             
             <ScheduleSnapshots />
           </div>
@@ -255,7 +270,7 @@ const isResetRoute = computed(() => route.name === 'reset')
   padding: 4rem 2.5rem 2.5rem;
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1rem;
   min-height: 100vh;
 }
 
@@ -376,12 +391,31 @@ const isResetRoute = computed(() => route.name === 'reset')
   cursor: pointer;
   transition: all 0.3s ease;
   width: 100%;
+  margin-bottom: 0rem;
 }
 
 .signout-button:hover {
   background: rgba(226, 192, 141, 0.1);
   border-color: #f4e4c1;
   transform: translateY(-2px);
+}
+
+.delete-button {
+  padding: 0rem;
+  background: transparent;
+  border: none;
+  color: rgba(226, 192, 141, 0.6);
+  border-radius: 0px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: -0.5rem;
+  margin-bottom: -0rem;
+}
+
+.delete-button:hover {
+  color: #ff6b6b;
 }
 
 /* Sidebar Animation */
