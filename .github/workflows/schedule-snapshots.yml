@@ -13,24 +13,12 @@ jobs:
       - name: Fetch and Process Snapshots
         run: |
           SUPABASE_URL="${{ secrets.VITE_SUPABASE_URL }}"
-          API_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+          API_KEY="${{ secrets.VITE_SUPABASE_KEY }}"
           
-          # Validate credentials
-          if [ -z "$API_KEY" ]; then
-            echo "❌ ERROR: SUPABASE_SERVICE_ROLE_KEY is not set!"
-            echo "Add it to GitHub Secrets: https://github.com/YOUR_REPO/settings/secrets/actions"
-            exit 1
-          fi
-          
-          if [ -z "$SUPABASE_URL" ]; then
-            echo "❌ ERROR: VITE_SUPABASE_URL is not set!"
-            exit 1
-          fi
-          
-          echo "✅ Using Service Role Key"
+          echo "✅ Using Anon Key (works!)"
           echo "📋 Fetching active schedules from: $SUPABASE_URL"
           
-          # Fetch ALL schedules (we'll filter in bash)
+          # Fetch ALL schedules
           RESPONSE=$(curl -s -X GET \
             "${SUPABASE_URL}/rest/v1/scheduled_snapshots?select=id,player_id,scheduled_until,status" \
             -H "apikey: ${API_KEY}" \
@@ -41,17 +29,15 @@ jobs:
           STATUS=$(echo "$RESPONSE" | tail -n 1)
           
           echo "HTTP Status: $STATUS"
+          echo "Raw response: $BODY"
           
           if [ "$STATUS" != "200" ]; then
-            echo "❌ API Error: $BODY"
+            echo "❌ API Error"
             exit 1
           fi
           
-          echo "Raw response: $BODY"
-          
-          # Validate JSON
           if ! echo "$BODY" | jq empty 2>/dev/null; then
-            echo "❌ Invalid JSON response"
+            echo "❌ Invalid JSON"
             exit 1
           fi
           
@@ -59,57 +45,49 @@ jobs:
           echo "Found $COUNT total schedules"
           
           if [ "$COUNT" -eq 0 ]; then
-            echo "✓ No schedules found (nothing to do)"
+            echo "✓ No schedules"
             exit 0
           fi
           
-          # Filter: only active and not expired
+          # Filter: active and not expired
           NOW=$(date -u +%s)
-          ACTIVE=$(echo "$BODY" | jq -r --argjson now "$NOW" '.[] | select(.status == "active" and (.scheduled_until | fromdateiso8601 | . >= ($now | tonumber))) | @json')
-          
-          ACTIVE_COUNT=$(echo "$ACTIVE" | grep -c . || echo 0)
-          echo "Found $ACTIVE_COUNT active (non-expired) schedules"
-          
-          if [ "$ACTIVE_COUNT" -eq 0 ]; then
-            echo "✓ No active schedules to process"
-            exit 0
-          fi
-          
-          # Process each active schedule
-          echo "$ACTIVE" | while read -r schedule_json; do
-            # Parse JSON
-            schedule=$(echo "$schedule_json" | jq 'fromjson')
+          echo "$BODY" | jq -c '.[]' | while read -r schedule; do
+            STATUS_VAL=$(echo "$schedule" | jq -r '.status')
+            UNTIL=$(echo "$schedule" | jq -r '.scheduled_until')
+            UNTIL_EPOCH=$(date -d "$UNTIL" +%s 2>/dev/null || echo 0)
+            
+            # Skip if expired or not active
+            if [ "$STATUS_VAL" != "active" ] || [ "$UNTIL_EPOCH" -le "$NOW" ]; then
+              continue
+            fi
+            
             PLAYER_ID=$(echo "$schedule" | jq -r '.player_id')
             
             echo ""
             echo "🔄 Processing player_id: $PLAYER_ID"
             
             # Fetch player
-            PLAYER_RESPONSE=$(curl -s -X GET \
+            PLAYER=$(curl -s -X GET \
               "${SUPABASE_URL}/rest/v1/players?player_id=eq.${PLAYER_ID}" \
-              -H "apikey: ${API_KEY}")
+              -H "apikey: ${API_KEY}" | jq '.[0]')
             
-            PLAYER=$(echo "$PLAYER_RESPONSE" | jq '.[0]')
             PUUID=$(echo "$PLAYER" | jq -r '.puuid // empty')
             GAME_NAME=$(echo "$PLAYER" | jq -r '.gameName // "?"')
             TAGLINE=$(echo "$PLAYER" | jq -r '.tagline // "?"')
             
             if [ -z "$PUUID" ]; then
-              echo "  ⚠ Skipping: No PUUID"
+              echo "  ⚠ No PUUID"
               continue
             fi
             
             echo "  🎮 ${GAME_NAME}#${TAGLINE}"
+            echo "    → Saving stats..."
             
-            # Save stats
-            echo "    Saving summoner stats..."
             curl -s "https://summonersheet.de/api/db/stats/save?puuid=${PUUID}&player_id=${PLAYER_ID}" > /dev/null 2>&1
-            
-            echo "    Saving champion stats..."
             curl -s "https://summonersheet.de/api/db/champion-stats/save?puuid=${PUUID}&player_id=${PLAYER_ID}" > /dev/null 2>&1
             
             echo "  ✅ Done"
           done
           
           echo ""
-          echo "✅ Snapshot job completed"
+          echo "✅ Job completed"
