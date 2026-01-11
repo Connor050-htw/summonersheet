@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import HelloWorld from './components/HelloWorld.vue'
 import AuthModal from './components/AuthModal.vue'
 import ResetPassword from './components/ResetPassword.vue'
+import ScheduleSnapshots from './components/ScheduleSnapshots.vue'
 import { useAuth } from './composables/useAuth'
 
 const { user, loading, initAuth, setupAuthListener, signOut } = useAuth()
@@ -70,6 +71,8 @@ const isResetRoute = computed(() => route.name === 'reset')
               <p class="user-email">{{ user.email }}</p>
             </div>
             <button @click="handleSignOut" class="signout-button">Sign Out</button>
+            
+            <ScheduleSnapshots />
           </div>
           
           <AuthModal v-else @close="closeAuthSidebar" />

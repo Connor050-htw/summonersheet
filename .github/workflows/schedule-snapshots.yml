@@ -1,0 +1,43 @@
+name: Daily Snapshot Scheduler
+
+on:
+  schedule:
+    # Run daily at 04:00 Berlin time (02:00 UTC in summer, 03:00 UTC in winter)
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  process-snapshots:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Active Schedules
+        id: fetch
+        run: |
+          # Extract project ID from VITE_SUPABASE_URL
+          SUPABASE_URL="${{ secrets.VITE_SUPABASE_URL }}"
+          PROJECT_ID=$(echo "$SUPABASE_URL" | sed 's/https:\/\/\(.*\)\.supabase\.co/\1/')
+          
+          SCHEDULES=$(curl -s -X GET \
+            "${SUPABASE_URL}/rest/v1/scheduled_snapshots?status=eq.active&scheduled_until=gt.$(date -u +%Y-%m-%dT%H:%M:%S.000Z)&select=id,player_id,players(puuid,gameName,tagline)" \
+            -H "apikey: ${{ secrets.VITE_SUPABASE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.VITE_SUPABASE_KEY }}")
+          echo "schedules=$SCHEDULES" >> $GITHUB_OUTPUT
+          echo "Found schedules: $SCHEDULES"
+
+      - name: Process Snapshots
+        run: |
+          SCHEDULES='${{ steps.fetch.outputs.schedules }}'
+          echo "$SCHEDULES" | jq -c '.[]' | while read schedule; do
+            PLAYER_ID=$(echo "$schedule" | jq -r '.player_id')
+            PUUID=$(echo "$schedule" | jq -r '.players.puuid')
+            GAME_NAME=$(echo "$schedule" | jq -r '.players.gameName')
+            TAGLINE=$(echo "$schedule" | jq -r '.players.tagline')
+            
+            echo "Processing ${GAME_NAME}#${TAGLINE}"
+            
+            # Call proxy endpoints to save stats
+            curl -s "https://summonersheet.de/api/db/stats/save?puuid=${PUUID}&player_id=${PLAYER_ID}" || true
+            curl -s "https://summonersheet.de/api/db/champion-stats/save?puuid=${PUUID}&player_id=${PLAYER_ID}" || true
+            
+            echo "✓ Snapshot saved for ${GAME_NAME}#${TAGLINE}"
+          done
