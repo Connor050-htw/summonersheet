@@ -90,43 +90,46 @@ jobs:
             
             # 1. Fetch summoner data from Riot API via worker
             echo "   Fetching summoner stats..."
-            SUMMONER_DATA=$(curl -s "${WORKER_URL}/api/lol/summoner/by-puuid/${PLATFORM}/${PUUID}" || echo '{"error":true}')
+            SUMMONER_DATA=$(curl -s "${WORKER_URL}/api/lol/summoner/by-puuid?puuid=${PUUID}&region=${PLATFORM}" 2>&1)
             
-            if [ "$(echo "$SUMMONER_DATA" | jq -r '.error // false')" = "true" ]; then
-              echo "   ❌ Error fetching summoner data"
+            # Check if valid JSON
+            if ! echo "$SUMMONER_DATA" | jq empty 2>/dev/null; then
+              echo "   ❌ Error fetching summoner data (invalid JSON): $(echo "$SUMMONER_DATA" | head -c 80)"
             else
               # Save summoner stats to DB via worker
               STATS_RESULT=$(curl -s -X POST "${WORKER_URL}/api/db/stats/save" \
                 -H "Content-Type: application/json" \
-                -d "{\"playerId\":${PLAYER_ID},\"summonerData\":${SUMMONER_DATA}}" || echo '{"error":"Stats save failed"}')
+                -d "{\"playerId\":${PLAYER_ID},\"summonerData\":${SUMMONER_DATA}}")
               echo "   ✅ Stats: $(echo "$STATS_RESULT" | jq -c '.')"
             fi
             
             # 2. Fetch champion mastery data from Riot API via worker
             echo "   Fetching champion mastery..."
-            MASTERY_DATA=$(curl -s "${WORKER_URL}/api/lol/champion-mastery/by-puuid/${PLATFORM}/${PUUID}" || echo '{"error":true}')
+            MASTERY_DATA=$(curl -s "${WORKER_URL}/api/lol/champion-mastery/by-puuid?puuid=${PUUID}&region=${PLATFORM}" 2>&1)
             
-            if [ "$(echo "$MASTERY_DATA" | jq 'if type == "array" then false else .error // false end')" = "true" ]; then
-              echo "   ❌ Error fetching champion mastery"
+            # Check if valid JSON array
+            if ! echo "$MASTERY_DATA" | jq empty 2>/dev/null; then
+              echo "   ❌ Error fetching champion mastery (invalid JSON): $(echo "$MASTERY_DATA" | head -c 80)"
             else
               # Save champion stats to DB via worker
               CHAMP_RESULT=$(curl -s -X POST "${WORKER_URL}/api/db/champion-stats/save" \
                 -H "Content-Type: application/json" \
-                -d "{\"playerId\":${PLAYER_ID},\"championMasteryData\":${MASTERY_DATA}}" || echo '{"error":"Champions save failed"}')
+                -d "{\"playerId\":${PLAYER_ID},\"championMasteryData\":${MASTERY_DATA}}")
               echo "   ✅ Champions: $(echo "$CHAMP_RESULT" | jq -c '.')"
             fi
             
             # 3. Fetch rank data from Riot API via worker
             echo "   Fetching rank data..."
-            RANK_DATA=$(curl -s "${WORKER_URL}/api/lol/league/by-puuid/${PLATFORM}/${PUUID}" || echo '{"error":true}')
+            RANK_DATA=$(curl -s "${WORKER_URL}/api/lol/league/by-puuid?puuid=${PUUID}&region=${PLATFORM}" 2>&1)
             
-            if [ "$(echo "$RANK_DATA" | jq 'if type == "array" then false else .error // false end')" = "true" ]; then
-              echo "   ❌ Error fetching rank data"
+            # Check if valid JSON array
+            if ! echo "$RANK_DATA" | jq empty 2>/dev/null; then
+              echo "   ❌ Error fetching rank data (invalid JSON): $(echo "$RANK_DATA" | head -c 80)"
             else
               # Save rank stats to DB via worker
               RANK_RESULT=$(curl -s -X POST "${WORKER_URL}/api/db/rank-stats/save" \
                 -H "Content-Type: application/json" \
-                -d "{\"playerId\":${PLAYER_ID},\"rankData\":${RANK_DATA}}" || echo '{"error":"Rank save failed"}')
+                -d "{\"playerId\":${PLAYER_ID},\"rankData\":${RANK_DATA}}")
               echo "   ✅ Rank: $(echo "$RANK_RESULT" | jq -c '.')"
             fi
             
