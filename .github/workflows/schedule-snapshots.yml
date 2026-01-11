@@ -65,8 +65,12 @@ jobs:
             -H "apikey: ${API_KEY}" \
             -H "Authorization: Bearer ${API_KEY}")
             
-            # Check if we got an array with data
-            if [ "$(echo "$PLAYER" | jq 'type')" != "array" ] || [ "$(echo "$PLAYER" | jq 'length')" -eq 0 ]; then
+            # Debug: Check response
+            PLAYER_TYPE=$(echo "$PLAYER" | jq -r 'type')
+            PLAYER_LENGTH=$(echo "$PLAYER" | jq 'length')
+            echo "   Debug - Type: $PLAYER_TYPE, Length: $PLAYER_LENGTH"
+            
+            if [ "$PLAYER_TYPE" != "array" ] || [ "$PLAYER_LENGTH" -eq 0 ]; then
               echo "⚠️  Skipping: Could not fetch player data (response: $(echo "$PLAYER" | head -c 100))"
               continue
             fi
