@@ -17,12 +17,18 @@ jobs:
           SUPABASE_URL="${{ secrets.VITE_SUPABASE_URL }}"
           PROJECT_ID=$(echo "$SUPABASE_URL" | sed 's/https:\/\/\(.*\)\.supabase\.co/\1/')
           
+          # Get current timestamp in UTC
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%S.000000Z)
+          
+          # Query: all active schedules where scheduled_until > now
           SCHEDULES=$(curl -s -X GET \
-            "${SUPABASE_URL}/rest/v1/scheduled_snapshots?status=eq.active&scheduled_until=gt.$(date -u +%Y-%m-%dT%H:%M:%S.000Z)&select=id,player_id,players(puuid,gameName,tagline)" \
+            "${SUPABASE_URL}/rest/v1/scheduled_snapshots?select=id,user_id,player_id,scheduled_until,players(puuid,gameName,tagline)&status=eq.active&scheduled_until=gte.${TIMESTAMP}" \
             -H "apikey: ${{ secrets.VITE_SUPABASE_KEY }}" \
             -H "Authorization: Bearer ${{ secrets.VITE_SUPABASE_KEY }}")
-          echo "schedules=$SCHEDULES" >> $GITHUB_OUTPUT
-          echo "Found schedules: $SCHEDULES"
+          
+          echo "schedules=${SCHEDULES}" >> $GITHUB_OUTPUT
+          echo "Current timestamp: ${TIMESTAMP}"
+          echo "Found schedules: ${SCHEDULES}"
 
       - name: Process Snapshots
         run: |
