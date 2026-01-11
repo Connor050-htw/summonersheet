@@ -13,7 +13,7 @@ jobs:
       - name: Fetch Active Schedules
         id: fetch
         run: |
-          SUPABASE_URL="${{ secrets.VITE_SUPABASE_KEY }}"
+          SUPABASE_URL="${{ secrets.VITE_SUPABASE_URL }}"
           API_KEY="${{ secrets.VITE_SUPABASE_KEY }}"
           
           echo "Fetching schedules from: $SUPABASE_URL"
