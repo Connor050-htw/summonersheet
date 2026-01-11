@@ -40,6 +40,7 @@ jobs:
         run: |
           API_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.VITE_SUPABASE_KEY }}"
           SUPABASE_URL="${{ secrets.VITE_SUPABASE_URL }}"
+          WORKER_URL="${{ secrets.VITE_PROXY_BASE }}"
           SCHEDULES='${{ steps.fetch.outputs.schedules }}'
           
           # Check count
@@ -58,14 +59,15 @@ jobs:
             echo ""
             echo "🔍 Processing player_id: $PLAYER_ID"
             
-            # Fetch player data
+            # Fetch player data including platformId
             PLAYER=$(curl -s -X GET \
-              "${SUPABASE_URL}/rest/v1/players?player_id=eq.${PLAYER_ID}&select=puuid,gameName,tagline" \
+              "${SUPABASE_URL}/rest/v1/players?id=eq.${PLAYER_ID}&select=puuid,gameName,tagline,platformId" \
               -H "apikey: ${API_KEY}" \
               -H "Authorization: Bearer ${API_KEY}")
             
             PLAYER_DATA=$(echo "$PLAYER" | jq '.[0]')
             PUUID=$(echo "$PLAYER_DATA" | jq -r '.puuid // empty')
+            PLATFORM=$(echo "$PLAYER_DATA" | jq -r '.platformId // empty')
             GAME_NAME=$(echo "$PLAYER_DATA" | jq -r '.gameName // empty')
             TAGLINE=$(echo "$PLAYER_DATA" | jq -r '.tagline // empty')
             
@@ -74,15 +76,51 @@ jobs:
               continue
             fi
             
-            echo "🎮 Saving snapshot for: ${GAME_NAME}#${TAGLINE}"
+            echo "🎮 Saving snapshot for: ${GAME_NAME}#${TAGLINE} (platform: ${PLATFORM})"
             
-            # Call proxy endpoints and show response (don't fail on error)
-            STATS_RESULT=$(curl -s "https://summonersheet.de/api/db/stats/save?puuid=${PUUID}&player_id=${PLAYER_ID}" || echo "Error: Stats endpoint failed")
-            CHAMP_RESULT=$(curl -s "https://summonersheet.de/api/db/champion-stats/save?puuid=${PUUID}&player_id=${PLAYER_ID}" || echo "Error: Champions endpoint failed")
+            # 1. Fetch summoner data from Riot API via worker
+            echo "   Fetching summoner stats..."
+            SUMMONER_DATA=$(curl -s "${WORKER_URL}/api/lol/summoner/by-puuid/${PLATFORM}/${PUUID}" || echo '{"error":true}')
             
-            echo "   Stats: $(echo "$STATS_RESULT" | head -c 100)"
-            echo "   Champions: $(echo "$CHAMP_RESULT" | head -c 100)"
-            echo "✅ Snapshot saved for ${GAME_NAME}#${TAGLINE}"
+            if [ "$(echo "$SUMMONER_DATA" | jq -r '.error // false')" = "true" ]; then
+              echo "   ❌ Error fetching summoner data"
+            else
+              # Save summoner stats to DB via worker
+              STATS_RESULT=$(curl -s -X POST "${WORKER_URL}/api/db/stats/save" \
+                -H "Content-Type: application/json" \
+                -d "{\"playerId\":${PLAYER_ID},\"summonerData\":${SUMMONER_DATA}}" || echo '{"error":"Stats save failed"}')
+              echo "   ✅ Stats: $(echo "$STATS_RESULT" | jq -c '.')"
+            fi
+            
+            # 2. Fetch champion mastery data from Riot API via worker
+            echo "   Fetching champion mastery..."
+            MASTERY_DATA=$(curl -s "${WORKER_URL}/api/lol/champion-mastery/by-puuid/${PLATFORM}/${PUUID}" || echo '{"error":true}')
+            
+            if [ "$(echo "$MASTERY_DATA" | jq 'if type == "array" then false else .error // false end')" = "true" ]; then
+              echo "   ❌ Error fetching champion mastery"
+            else
+              # Save champion stats to DB via worker
+              CHAMP_RESULT=$(curl -s -X POST "${WORKER_URL}/api/db/champion-stats/save" \
+                -H "Content-Type: application/json" \
+                -d "{\"playerId\":${PLAYER_ID},\"championMasteryData\":${MASTERY_DATA}}" || echo '{"error":"Champions save failed"}')
+              echo "   ✅ Champions: $(echo "$CHAMP_RESULT" | jq -c '.')"
+            fi
+            
+            # 3. Fetch rank data from Riot API via worker
+            echo "   Fetching rank data..."
+            RANK_DATA=$(curl -s "${WORKER_URL}/api/lol/league/by-puuid/${PLATFORM}/${PUUID}" || echo '{"error":true}')
+            
+            if [ "$(echo "$RANK_DATA" | jq 'if type == "array" then false else .error // false end')" = "true" ]; then
+              echo "   ❌ Error fetching rank data"
+            else
+              # Save rank stats to DB via worker
+              RANK_RESULT=$(curl -s -X POST "${WORKER_URL}/api/db/rank-stats/save" \
+                -H "Content-Type: application/json" \
+                -d "{\"playerId\":${PLAYER_ID},\"rankData\":${RANK_DATA}}" || echo '{"error":"Rank save failed"}')
+              echo "   ✅ Rank: $(echo "$RANK_RESULT" | jq -c '.')"
+            fi
+            
+            echo "✅ Snapshot complete for ${GAME_NAME}#${TAGLINE}"
           done
           
           echo ""
