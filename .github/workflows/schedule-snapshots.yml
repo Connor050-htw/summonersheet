@@ -13,35 +13,55 @@ jobs:
       - name: Fetch Active Schedules
         id: fetch
         run: |
-          # Extract project ID from VITE_SUPABASE_URL
           SUPABASE_URL="${{ secrets.VITE_SUPABASE_URL }}"
-          PROJECT_ID=$(echo "$SUPABASE_URL" | sed 's/https:\/\/\(.*\)\.supabase\.co/\1/')
           
-          # Get current timestamp in UTC
-          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%S.000000Z)
-          
-          # Query: all active schedules where scheduled_until > now
+          # Fetch ALL active schedules (no date filter yet)
           SCHEDULES=$(curl -s -X GET \
-            "${SUPABASE_URL}/rest/v1/scheduled_snapshots?select=id,user_id,player_id,scheduled_until,players(puuid,gameName,tagline)&status=eq.active&scheduled_until=gte.${TIMESTAMP}" \
-            -H "apikey: ${{ secrets.VITE_SUPABASE_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.VITE_SUPABASE_KEY }}")
+            "${SUPABASE_URL}/rest/v1/scheduled_snapshots?select=id,user_id,player_id,scheduled_until,players(puuid,gameName,tagline)&status=eq.active" \
+            -H "apikey: ${{ secrets.VITE_SUPABASE_KEY }}")
           
-          echo "schedules=${SCHEDULES}" >> $GITHUB_OUTPUT
-          echo "Current timestamp: ${TIMESTAMP}"
-          echo "Found schedules: ${SCHEDULES}"
+          echo "Raw response:"
+          echo "$SCHEDULES" | jq '.'
+          
+          # Filter: only schedules where scheduled_until >= now
+          NOW=$(date -u +%s)
+          FILTERED=$(echo "$SCHEDULES" | jq --arg now "$NOW" '[.[] | select(.scheduled_until | fromdateiso8601 | . >= ($now | tonumber))]')
+          
+          echo "filtered=$FILTERED" >> $GITHUB_OUTPUT
+          echo "Filtered schedules: $FILTERED"
 
       - name: Process Snapshots
         run: |
-          SCHEDULES='${{ steps.fetch.outputs.schedules }}'
-          echo "$SCHEDULES" | jq -c '.[]' | while read schedule; do
+          SCHEDULES='${{ steps.fetch.outputs.filtered }}'
+          echo "Processing: $SCHEDULES"
+          
+          if [ "$SCHEDULES" == "[]" ] || [ -z "$SCHEDULES" ]; then
+            echo "No active schedules found"
+            exit 0
+          fi
+          
+          echo "$SCHEDULES" | jq -r '.[] | @base64' | while read encoded; do
+            schedule=$(echo "$encoded" | base64 -d)
             PLAYER_ID=$(echo "$schedule" | jq -r '.player_id')
-            PUUID=$(echo "$schedule" | jq -r '.players.puuid')
-            GAME_NAME=$(echo "$schedule" | jq -r '.players.gameName')
-            TAGLINE=$(echo "$schedule" | jq -r '.players.tagline')
+            PLAYERS=$(echo "$schedule" | jq '.players')
             
-            echo "Processing ${GAME_NAME}#${TAGLINE}"
+            if [ "$PLAYERS" == "null" ]; then
+              echo "⚠ Schedule has no player data"
+              continue
+            fi
             
-            # Call proxy endpoints to save stats
+            PUUID=$(echo "$PLAYERS" | jq -r '.puuid')
+            GAME_NAME=$(echo "$PLAYERS" | jq -r '.gameName')
+            TAGLINE=$(echo "$PLAYERS" | jq -r '.tagline')
+            
+            if [ "$PUUID" == "null" ]; then
+              echo "⚠ Player missing PUUID"
+              continue
+            fi
+            
+            echo "Processing ${GAME_NAME}#${TAGLINE} (Player ${PLAYER_ID})"
+            
+            # Call proxy endpoints
             curl -s "https://summonersheet.de/api/db/stats/save?puuid=${PUUID}&player_id=${PLAYER_ID}" || true
             curl -s "https://summonersheet.de/api/db/champion-stats/save?puuid=${PUUID}&player_id=${PLAYER_ID}" || true
             
