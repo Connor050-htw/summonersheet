@@ -10,48 +10,30 @@ jobs:
   process-snapshots:
     runs-on: ubuntu-latest
     steps:
-      - name: Fetch Active Schedules
-        id: fetch
+      - name: Fetch and Process Snapshots
         run: |
           SUPABASE_URL="${{ secrets.VITE_SUPABASE_URL }}"
-          # Try to use Service Role Key (bypasses RLS), fallback to Anon Key
           API_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.VITE_SUPABASE_KEY }}"
           
-          echo "Fetching schedules from: $SUPABASE_URL"
-          echo "Using API Key: ${API_KEY:0:20}..."
+          echo "📋 Fetching active schedules..."
           
-          # Fetch ONLY scheduled_snapshots table, no joins, no filters
+          # Fetch schedules
           SCHEDULES=$(curl -s -X GET \
             "${SUPABASE_URL}/rest/v1/scheduled_snapshots?select=id,user_id,player_id,scheduled_until,status" \
-            -H "apikey: ${API_KEY}" \
-            -H "Authorization: Bearer ${API_KEY}")
+            -H "apikey: ${API_KEY}")
           
-          echo "Full API Response:"
-          echo "$SCHEDULES" | jq '.' 2>/dev/null || echo "$SCHEDULES"
-          
-          # Store in output
-          echo "schedules=$SCHEDULES" >> $GITHUB_OUTPUT
-
-      - name: Process Snapshots
-        run: |
-          API_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.VITE_SUPABASE_KEY }}"
-          SUPABASE_URL="${{ secrets.VITE_SUPABASE_URL }}"
-          SCHEDULES='${{ steps.fetch.outputs.schedules }}'
-          
-          echo "Input schedules: $SCHEDULES"
-          
-          # Check if empty or error
-          if echo "$SCHEDULES" | grep -q "error" || echo "$SCHEDULES" | grep -q "^null"; then
-            echo "API Error: $SCHEDULES"
+          # Check for errors
+          if echo "$SCHEDULES" | grep -q "error"; then
+            echo "❌ API Error: $SCHEDULES"
             exit 1
           fi
           
-          # Check count
+          # Count
           COUNT=$(echo "$SCHEDULES" | jq 'length' 2>/dev/null || echo 0)
-          echo "Found $COUNT schedules"
+          echo "Found $COUNT total schedules"
           
           if [ "$COUNT" -eq 0 ]; then
-            echo "No schedules to process"
+            echo "✓ No schedules, nothing to do"
             exit 0
           fi
           
@@ -60,39 +42,46 @@ jobs:
           ACTIVE=$(echo "$SCHEDULES" | jq --argjson now "$NOW" '[.[] | select(.status == "active" and (.scheduled_until | fromdateiso8601 | . >= ($now | tonumber)))]')
           
           ACTIVE_COUNT=$(echo "$ACTIVE" | jq 'length')
-          echo "Active schedules (not expired): $ACTIVE_COUNT"
+          echo "Found $ACTIVE_COUNT active schedules to process"
           
           if [ "$ACTIVE_COUNT" -eq 0 ]; then
-            echo "No active schedules to process"
+            echo "✓ No active schedules"
             exit 0
           fi
           
           # Process each active schedule
-          echo "$ACTIVE" | jq -c '.[]' | while IFS= read -r schedule; do
+          echo "$ACTIVE" | jq -c '.[]' | while read -r schedule; do
             PLAYER_ID=$(echo "$schedule" | jq -r '.player_id')
             
+            echo ""
             echo "Processing player_id: $PLAYER_ID"
             
             # Fetch player data
             PLAYER=$(curl -s -X GET \
-              "${SUPABASE_URL}/rest/v1/players?player_id=eq.${PLAYER_ID}&select=puuid,gameName,tagline" \
+              "${SUPABASE_URL}/rest/v1/players?player_id=eq.${PLAYER_ID}" \
               -H "apikey: ${API_KEY}")
             
-            PLAYER_DATA=$(echo "$PLAYER" | jq '.[0]')
+            PLAYER_DATA=$(echo "$PLAYER" | jq '.[0] // empty')
             PUUID=$(echo "$PLAYER_DATA" | jq -r '.puuid // empty')
-            GAME_NAME=$(echo "$PLAYER_DATA" | jq -r '.gameName // empty')
-            TAGLINE=$(echo "$PLAYER_DATA" | jq -r '.tagline // empty')
+            GAME_NAME=$(echo "$PLAYER_DATA" | jq -r '.gameName // "Unknown"')
+            TAGLINE=$(echo "$PLAYER_DATA" | jq -r '.tagline // "?"')
             
-            if [ -z "$PUUID" ]; then
-              echo "⚠ Skipping: Player $PLAYER_ID has no PUUID"
+            if [ -z "$PUUID" ] || [ "$PUUID" == "null" ]; then
+              echo "  ⚠ Skipping: No PUUID found"
               continue
             fi
             
-            echo "🎮 Saving snapshot for: ${GAME_NAME}#${TAGLINE}"
+            echo "  🎮 ${GAME_NAME}#${TAGLINE}"
             
             # Call proxy endpoints
+            echo "    → Saving summoner stats..."
             curl -s "https://summonersheet.de/api/db/stats/save?puuid=${PUUID}&player_id=${PLAYER_ID}" > /dev/null 2>&1
+            
+            echo "    → Saving champion stats..."
             curl -s "https://summonersheet.de/api/db/champion-stats/save?puuid=${PUUID}&player_id=${PLAYER_ID}" > /dev/null 2>&1
             
-            echo "✓ Snapshot saved"
+            echo "  ✓ Done"
           done
+          
+          echo ""
+          echo "✅ All snapshots processed"
