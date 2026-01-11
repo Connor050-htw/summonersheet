@@ -59,15 +59,19 @@ jobs:
             echo ""
             echo "🔍 Processing player_id: $PLAYER_ID"
             
-            # Fetch player data including platformId
+            # Fetch player data including region
             PLAYER=$(curl -s -X GET \
-              "${SUPABASE_URL}/rest/v1/players?id=eq.${PLAYER_ID}&select=puuid,gameName,tagline,platformId" \
-              -H "apikey: ${API_KEY}" \
-              -H "Authorization: Bearer ${API_KEY}")
-            
-            PLAYER_DATA=$(echo "$PLAYER" | jq '.[0]')
+            "${SUPABASE_URL}/rest/v1/players?player_id=eq.${PLAYER_ID}&select=puuid,gameName,tagline,region" \
+            -H "apikey: ${API_KEY}" \
+            -H "Authorization: Bearer ${API_KEY}")
+          
+          # Check if we got an array with data
+          if [ "$(echo "$PLAYER" | jq 'type')" != "array" ] || [ "$(echo "$PLAYER" | jq 'length')" -eq 0 ]; then
+            echo "⚠️  Skipping: Could not fetch player data (response: $(echo "$PLAYER" | head -c 100))"
+            continue
+          fi
             PUUID=$(echo "$PLAYER_DATA" | jq -r '.puuid // empty')
-            PLATFORM=$(echo "$PLAYER_DATA" | jq -r '.platformId // empty')
+            PLATFORM=$(echo "$PLAYER_DATA" | jq -r '.region // empty')
             GAME_NAME=$(echo "$PLAYER_DATA" | jq -r '.gameName // empty')
             TAGLINE=$(echo "$PLAYER_DATA" | jq -r '.tagline // empty')
             
