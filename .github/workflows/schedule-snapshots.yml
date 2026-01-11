@@ -76,9 +76,9 @@ jobs:
             
             echo "🎮 Saving snapshot for: ${GAME_NAME}#${TAGLINE}"
             
-            # Call proxy endpoints and show response
-            STATS_RESULT=$(curl -s "https://summonersheet.de/api/db/stats/save?puuid=${PUUID}&player_id=${PLAYER_ID}")
-            CHAMP_RESULT=$(curl -s "https://summonersheet.de/api/db/champion-stats/save?puuid=${PUUID}&player_id=${PLAYER_ID}")
+            # Call proxy endpoints and show response (don't fail on error)
+            STATS_RESULT=$(curl -s "https://summonersheet.de/api/db/stats/save?puuid=${PUUID}&player_id=${PLAYER_ID}" || echo "Error: Stats endpoint failed")
+            CHAMP_RESULT=$(curl -s "https://summonersheet.de/api/db/champion-stats/save?puuid=${PUUID}&player_id=${PLAYER_ID}" || echo "Error: Champions endpoint failed")
             
             echo "   Stats: $(echo "$STATS_RESULT" | head -c 100)"
             echo "   Champions: $(echo "$CHAMP_RESULT" | head -c 100)"
