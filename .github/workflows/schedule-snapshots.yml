@@ -28,8 +28,9 @@ jobs:
           echo "Raw data received: $(echo "$SCHEDULES" | jq 'length') records"
           
           # Filter: only active and not expired
-          NOW=$(date -u +%s)
-          ACTIVE=$(echo "$SCHEDULES" | jq --argjson now "$NOW" -c '[.[] | select(.status == "active" and (.scheduled_until | fromdateiso8601 | . >= $now))]')
+          # Use string comparison (ISO 8601 is lexicographically sortable)
+          NOW=$(date -u +"%Y-%m-%dT%H:%M:%S")
+          ACTIVE=$(echo "$SCHEDULES" | jq --arg now "$NOW" -c '[.[] | select(.status == "active" and .scheduled_until > $now)]')
           
           echo "✅ Found $(echo "$ACTIVE" | jq 'length') active (not expired) schedules"
           
