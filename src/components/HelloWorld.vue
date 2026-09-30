@@ -7,8 +7,8 @@
         <p>
           <strong>What is this Website?</strong><br/>
           Generate a beautiful PDF with the most important stats and information about your League of Legends account.<br />
-          You can share, download, or print the PDF to impress your friend!<br /><br />
-          Your statistics are saved for the day as soon as you search for your account.<br />
+          You can share, download, or print the PDF to impress your friends!<br /><br />
+          The statistics are saved for the day as soon as you search for a account.<br />
           This allows you to view old statistics as well.  
         </p>
       </div>
